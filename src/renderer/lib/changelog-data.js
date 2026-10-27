@@ -1,6 +1,23 @@
 // Generated from CHANGELOG.md by `npm run sync:changelog`. Don't edit.
 export default [
   {
+    "version": "0.2.0",
+    "date": "2026-10-27",
+    "prerelease": false,
+    "summary": "",
+    "sections": [
+      {
+        "title": "Fixed",
+        "items": [
+          {
+            "text": "A finished scan no longer stays stuck on \"100%\": the map now opens as soon as the scan ends. If loading the results ever fails, Strata shows the error instead of freezing.",
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.2.0-beta.1",
     "date": "2026-10-27",
     "prerelease": true,

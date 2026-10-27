@@ -1,6 +1,6 @@
 [package]
 name = "strata"
-version = "0.2.0-beta.1"
+version = "0.2.0"
 description = "See what fills your disk, then clean it up"
 authors = ["Florent Vandroy"]
 license = "MIT"
