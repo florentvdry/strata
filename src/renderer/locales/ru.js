@@ -253,7 +253,7 @@ export default {
   "Same size & samples as {path}": "Тот же размер и образцы, что у {path}",
   "Scan finished — the map now shows everything.": "Сканирование завершено — теперь на карте показано всё.",
   "Scan normally": "Сканировать обычным способом",
-  "Scan now →": "Сканировать →",
+  "Scan now →": "Сканировать сейчас →",
   "Scan options": "Параметры сканирования",
   "Scan stopped": "Сканирование остановлено",
   "Scan {root}": "Сканировать {root}",
