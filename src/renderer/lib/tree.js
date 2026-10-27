@@ -1,3 +1,4 @@
+import { t } from './i18n.js';
 // The in-memory scan result: flat typed arrays, parents before children.
 import { TYPE_COUNT, typeOfName } from './types.js';
 import { sep, fold } from './platform.js';
@@ -10,7 +11,7 @@ export function parseScan(bytes) {
   const buf = u8.buffer, base = u8.byteOffset;
   const dv = new DataView(buf, base, u8.byteLength);
   const magic = new TextDecoder().decode(u8.subarray(0, 8));
-  if (magic !== 'STRATA01') throw new Error('Not a Strata scan file');
+  if (magic !== 'STRATA01') throw new Error(t('Not a Strata scan file'));
   const hlen = dv.getInt32(8, true);
   const header = JSON.parse(new TextDecoder().decode(u8.subarray(12, 12 + hlen)));
   let off = (12 + hlen + 7) & ~7;

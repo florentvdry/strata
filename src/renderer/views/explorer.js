@@ -7,8 +7,9 @@ import { SpaceMap, MiniMap } from '../components/map.js';
 import { TYPES, SHADE } from '../lib/types.js';
 import { parseQuery, runSearch } from '../lib/search.js';
 import { CATS, selectionStats } from '../lib/cleanup.js';
-import { bytesParts, fmtBytes, fmtPair, fmtPct, fmtShort, fmtWhen, fmtDur, plural } from '../lib/format.js';
-import { isWin, trimSep, TRASH, FILE_MANAGER } from '../lib/platform.js';
+import { bytesParts, fmtBytes, fmtPair, fmtPct, fmtShort, fmtWhen, fmtDur } from '../lib/format.js';
+import { isWin, trimSep, trash, fileManager } from '../lib/platform.js';
+import { t } from '../lib/i18n.js';
 import { driveName } from './start.js';
 import * as A from '../actions.js';
 
@@ -20,10 +21,10 @@ const compact = (b) => {
   return parseFloat(p.num) >= 10 ? `${Math.round(parseFloat(p.num))} ${p.unit}` : `${p.num} ${p.unit}`;
 };
 
-const VIEWS = [
-  { id: 'treemap', label: 'Treemap', hint: 'Every block is a file, sized by bytes' },
-  { id: 'sunburst', label: 'Sunburst', hint: 'Rings are folder levels, sized by bytes' },
-  { id: 'columns', label: 'Columns', hint: 'Each column goes one folder deeper' },
+const views = () => [
+  { id: 'treemap', label: t('Treemap'), hint: t('Every block is a file, sized by bytes') },
+  { id: 'sunburst', label: t('Sunburst'), hint: t('Rings are folder levels, sized by bytes') },
+  { id: 'columns', label: t('Columns'), hint: t('Each column goes one folder deeper') },
 ];
 
 // ───────────── derived data ─────────────
@@ -128,7 +129,7 @@ function Breadcrumb({ tree, zoom }) {
   let crumbs = anc.map((i) => ({ i, l: label(i) }));
   if (crumbs.length > 6) crumbs = [crumbs[0], { i: -1, l: '…' }, ...crumbs.slice(-4)];
   return html`
-    <nav aria-label="Breadcrumb" title=${tree.path(zoom)} style="display: flex; align-items: center; gap: 6px; font-family: 'Geist Mono', monospace; font-size: 13px; color: #9BA3AF; padding: 6px 10px; background: #181C22; border: 1px solid #262B33; border-radius: 8px; min-width: 0; max-width: 44vw; overflow: hidden; white-space: nowrap">
+    <nav aria-label=${t('Breadcrumb')} title=${tree.path(zoom)} style="display: flex; align-items: center; gap: 6px; font-family: 'Geist Mono', monospace; font-size: 13px; color: #9BA3AF; padding: 6px 10px; background: #181C22; border: 1px solid #262B33; border-radius: 8px; min-width: 0; max-width: 44vw; overflow: hidden; white-space: nowrap">
       ${crumbs.map((c, k) => html`
         ${k > 0 && html`<span aria-hidden="true">/</span>`}
         ${c.i < 0 ? html`<span>…</span>` : html`<button type="button" class="crumb" onClick=${() => A.zoomTo(c.i)} aria-current=${c.i === zoom ? 'page' : undefined}
@@ -159,8 +160,8 @@ function SearchBox({ query }) {
   return html`
     <label style="display: flex; align-items: center; gap: 8px; padding: 0 12px; height: 38px; background: #181C22; border: 1px solid #262B33; border-radius: 8px; min-width: 240px; box-sizing: border-box">
       ${Icon.search()}
-      <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Search files</span>
-      <input ref=${ref} type="search" value=${val} onInput=${onInput} onKeyDown=${onKeyDown} placeholder="Search files, *.mkv, >1 GB…" style="background: transparent; border: 0; outline: none; color: #E6E8EB; font: inherit; width: 100%" />
+      <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">${t('Search files')}</span>
+      <input ref=${ref} type="search" value=${val} onInput=${onInput} onKeyDown=${onKeyDown} placeholder=${t('Search files, *.mkv, >1 GB…')} style="background: transparent; border: 0; outline: none; color: #E6E8EB; font: inherit; width: 100%" />
       <kbd style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #9BA3AF; border: 1px solid #333944; border-radius: 4px; padding: 1px 5px; white-space: nowrap">Ctrl K</kbd>
     </label>`;
 }
@@ -184,17 +185,18 @@ function SmartButton({ id, label, value, active }) {
 
 function Footer({ tree, scan, partial }) {
   const hv = useStore(hover);
-  let status = 'Hover a block to inspect · click to select · double-click to zoom in';
+  let status = t('Hover a block to inspect · click to select · double-click to zoom in');
   if (hv.id >= 0 && tree && hv.id < tree.n) status = `${tree.path(hv.id)}  —  ${fmtBytes(tree.size[hv.id])}`;
   const h = tree.header;
   const cluster = h.cluster >= 1024 ? `${h.cluster / 1024} KB` : `${h.cluster} B`;
+  const partialText = scan ? (scan.paused ? t('Partial results · scan {pct}% (paused)', { pct: Math.floor(scan.pct * 100) }) : t('Partial results · scan {pct}%', { pct: Math.floor(scan.pct * 100) })) : '';
   return html`
     <footer style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 8px 20px; border-top: 1px solid #22262D; background: #12151A; font-family: 'Geist Mono', monospace; font-size: 12px; color: #9BA3AF; min-height: 36px; box-sizing: border-box; position: sticky; bottom: 0; z-index: 5">
       <span style=${`width: 8px; height: 8px; border-radius: 4px; background: ${partial && scan ? '#F59E0B' : 'var(--accent)'}`}></span>
       <span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #C9CED6">${status}</span>
-      ${partial && scan && html`<span style="color: #F5B54A">Partial results · scan ${Math.floor(scan.pct * 100)}%${scan.paused ? ' (paused)' : ''} · <a href="#" onClick=${(e) => { e.preventDefault(); A.go('scanning'); }}>View progress</a></span>`}
-      ${partial && !scan && html`<span style="color: #F5B54A">Partial results</span>`}
-      <span>${h.fs || 'Folder'}${h.fs ? ` · ${cluster} clusters` : ''}</span>
+      ${partial && scan && html`<span style="color: #F5B54A">${partialText} · <a href="#" onClick=${(e) => { e.preventDefault(); A.go('scanning'); }}>${t('View progress')}</a></span>`}
+      ${partial && !scan && html`<span style="color: #F5B54A">${t('Partial results')}</span>`}
+      <span>${h.fs ? `${h.fs} · ${t('{size} clusters', { size: cluster })}` : t('Folder')}</span>
       <span>v${store.state.info.version.replace(/\.0$/, '')}</span>
     </footer>`;
 }
@@ -213,11 +215,11 @@ function Details({ tree, node, ex, settings, cleanup, drive, queue }) {
     const st = selectionStats(tree, cleanup.items.filter((i) => i.cat === c.id), cleanup.on);
     return { c, bytes: st.bytes, n: st.chosen.length };
   }).filter((x) => x.n > 0);
-  const label = (c) => (c.id === 'installer' && cleanup.items.some((i) => i.cat === 'installer' && cleanup.on[i.id] && /\.iso$/i.test(i.name)) ? 'Old installers (.iso)' : c.short);
+  const label = (c) => (c.id === 'installer' && cleanup.items.some((i) => i.cat === 'installer' && cleanup.on[i.id] && /\.iso$/i.test(i.name)) ? t('Old installers (.iso)') : c.short);
   return html`
-    <aside aria-label="Selection details" style="flex: 1 1 288px; max-width: 100%; padding: 20px; border-left: 1px solid #22262D; display: flex; flex-direction: column; gap: 20px; box-sizing: border-box; background: #101317">
+    <aside aria-label=${t('Selection details')} style="flex: 1 1 288px; max-width: 100%; padding: 20px; border-left: 1px solid #22262D; display: flex; flex-direction: column; gap: 20px; box-sizing: border-box; background: #101317">
       <div style="display: flex; flex-direction: column; gap: 10px">
-        <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #8C94A0">Selected</span>
+        <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #8C94A0">${t('Selected')}</span>
         ${isDir && size > 0
           ? html`<${MiniMap} tree=${tree} version=${v} node=${node} shading=${settings.shading} />`
           : html`<div style=${`height: 96px; border-radius: 12px; background-color: ${ty.c}; ${settings.shading ? `background-image: ${SHADE};` : ''}`}></div>`}
@@ -225,22 +227,22 @@ function Details({ tree, node, ex, settings, cleanup, drive, queue }) {
         <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #9BA3AF; word-break: break-all">${tree.path(node)}</span>
       </div>
       <dl style="margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 10px 16px; font-size: 13px">
-        <dt style="color: #9BA3AF">Size</dt><dd style="margin: 0; text-align: right; font-family: 'Geist Mono', monospace">${fmtBytes(size)}</dd>
-        <dt style="color: #9BA3AF">Of drive</dt><dd style="margin: 0; text-align: right; font-family: 'Geist Mono', monospace">${fmtPct(size, capacity)}</dd>
-        <dt style="color: #9BA3AF">Of folder</dt><dd style="margin: 0; text-align: right; font-family: 'Geist Mono', monospace">${node === 0 ? '—' : fmtPct(size, parentSize)}</dd>
-        <dt style="color: #9BA3AF">Type</dt><dd style="margin: 0; text-align: right">${isDir ? `Folder · ${plural(tree.files[node], 'file')}` : ty.l}</dd>
-        ${tree.mtime[node] > 0 && html`<dt style="color: #9BA3AF">Modified</dt><dd style="margin: 0; text-align: right">${fmtWhen(tree.mtime[node] * 1000)}</dd>`}
+        <dt style="color: #9BA3AF">${t('Size')}</dt><dd style="margin: 0; text-align: right; font-family: 'Geist Mono', monospace">${fmtBytes(size)}</dd>
+        <dt style="color: #9BA3AF">${t('Of drive')}</dt><dd style="margin: 0; text-align: right; font-family: 'Geist Mono', monospace">${fmtPct(size, capacity)}</dd>
+        <dt style="color: #9BA3AF">${t('Of folder')}</dt><dd style="margin: 0; text-align: right; font-family: 'Geist Mono', monospace">${node === 0 ? '—' : fmtPct(size, parentSize)}</dd>
+        <dt style="color: #9BA3AF">${t('Type')}</dt><dd style="margin: 0; text-align: right">${isDir ? t('Folder · {n, plural, one {# file} other {# files}}', { n: tree.files[node] }) : ty.l}</dd>
+        ${tree.mtime[node] > 0 && html`<dt style="color: #9BA3AF">${t('Modified')}</dt><dd style="margin: 0; text-align: right">${fmtWhen(tree.mtime[node] * 1000)}</dd>`}
       </dl>
       <div style="display: flex; flex-direction: column; gap: 8px">
-        <button type="button" class="hov-accent" disabled=${node === 0} onClick=${() => A.toggleCleanupNode(node)} style=${`height: 44px; border-radius: 10px; border: ${queued ? '1px solid var(--accent)' : '0'}; background: ${queued ? 'transparent' : 'var(--accent)'}; color: ${queued ? 'var(--accent)' : '#0E1014'}; font-weight: 600; cursor: pointer`}>${queued ? 'Remove from cleanup' : 'Add to cleanup'}</button>
-        <button type="button" class="hov-ghost" onClick=${() => A.reveal(tree.path(node))} style="height: 44px; border-radius: 10px; border: 1px solid #333944; background: transparent; color: #E6E8EB; font-weight: 500; cursor: pointer">Show in ${FILE_MANAGER}</button>
-        <button type="button" class="hov-danger" disabled=${node === 0} onClick=${() => A.confirmTrash(node)} style="height: 44px; border-radius: 10px; border: 1px solid #5A2A2E; background: transparent; color: #FF9AA2; font-weight: 500; cursor: pointer">Move to ${TRASH}</button>
+        <button type="button" class="hov-accent" disabled=${node === 0} onClick=${() => A.toggleCleanupNode(node)} style=${`height: 44px; border-radius: 10px; border: ${queued ? '1px solid var(--accent)' : '0'}; background: ${queued ? 'transparent' : 'var(--accent)'}; color: ${queued ? 'var(--accent)' : '#0E1014'}; font-weight: 600; cursor: pointer`}>${queued ? t('Remove from cleanup') : t('Add to cleanup')}</button>
+        <button type="button" class="hov-ghost" onClick=${() => A.reveal(tree.path(node))} style="height: 44px; border-radius: 10px; border: 1px solid #333944; background: transparent; color: #E6E8EB; font-weight: 500; cursor: pointer">${t('Show in {app}', { app: fileManager() })}</button>
+        <button type="button" class="hov-danger" disabled=${node === 0} onClick=${() => A.confirmTrash(node)} style="height: 44px; border-radius: 10px; border: 1px solid #5A2A2E; background: transparent; color: #FF9AA2; font-weight: 500; cursor: pointer">${t('Move to {trash}', { trash: trash() })}</button>
       </div>
       <div style="display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 12px; background: #14171C; border: 1px solid #22262D">
-        <div style="display: flex; justify-content: space-between; align-items: baseline"><span style="font-weight: 600">Cleanup queue</span><span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: var(--accent)">${fmtBytes(queue.bytes)}</span></div>
-        ${byCat.length === 0 && html`<span style="font-size: 13px; color: #9BA3AF">Nothing queued yet.</span>`}
+        <div style="display: flex; justify-content: space-between; align-items: baseline"><span style="font-weight: 600">${t('Cleanup queue')}</span><span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: var(--accent)">${fmtBytes(queue.bytes)}</span></div>
+        ${byCat.length === 0 && html`<span style="font-size: 13px; color: #9BA3AF">${t('Nothing queued yet.')}</span>`}
         ${byCat.map((x) => html`<div style="display: flex; justify-content: space-between; font-size: 13px; color: #C9CED6"><span>${label(x.c)}</span><span style="font-family: 'Geist Mono', monospace; font-size: 12px">${fmtBytes(x.bytes)}</span></div>`)}
-        <a href="#" onClick=${(e) => { e.preventDefault(); A.go('cleanup'); }} style="margin-top: 4px; font-weight: 500; text-decoration: none">Review queue →</a>
+        <a href="#" onClick=${(e) => { e.preventDefault(); A.go('cleanup'); }} style="margin-top: 4px; font-weight: 500; text-decoration: none">${t('Review queue →')}</a>
       </div>
     </aside>`;
 }
@@ -272,18 +274,18 @@ export function Explorer() {
     const flatRows = (ids, sub) => ids.map((i) => ({ id: i, depth: 0, dir: tree.isDir(i), flat: true, sub: sub ? sub(i) : tree.rel(tree.parent[i]) }));
     if (p === 'search') {
       const r = runSearch(tree, zoom, parseQuery(ex.query));
-      return { title: 'Search results', sub: `${plural(r.count, 'match', 'matches')} · ${fmtBytes(r.bytes)}${r.count > r.hits.length ? ` · showing ${r.hits.length}` : ''}`, rows: flatRows(r.hits), mark: r.hits };
+      return { title: t('Search results'), sub: `${t('{n, plural, one {# match} other {# matches}}', { n: r.count })} · ${fmtBytes(r.bytes)}${r.count > r.hits.length ? ` · ${t('showing {n}', { n: r.hits.length })}` : ''}`, rows: flatRows(r.hits), mark: r.hits };
     }
-    if (p === 'largest') return { title: 'Largest files', sub: `Top ${smart.largest.length} in ${tree.names[0]}`, rows: flatRows(smart.largest), mark: smart.largest };
-    if (p === 'old') return { title: 'Untouched for 1 year', sub: `${plural(smart.old.count, 'file')} · ${fmtBytes(smart.old.bytes)} not modified in a year`, rows: flatRows(smart.old.ids), mark: smart.old.ids };
+    if (p === 'largest') return { title: t('Largest files'), sub: t('Top {n} in {root}', { n: smart.largest.length, root: tree.names[0] }), rows: flatRows(smart.largest), mark: smart.largest };
+    if (p === 'old') return { title: t('Untouched for 1 year'), sub: t('{n, plural, one {# file} other {# files}} · {size} not modified in a year', { n: smart.old.count, size: fmtBytes(smart.old.bytes) }), rows: flatRows(smart.old.ids), mark: smart.old.ids };
     if (p === 'dupes') {
       const rows = [];
       const mark = [];
       for (const g of dg.slice(0, 200)) {
-        g.ids.forEach((i, k) => { rows.push({ id: i, depth: 0, dir: false, flat: true, sub: `${k === 0 ? 'Oldest copy' : 'Copy'} · ${tree.rel(tree.parent[i])}` }); mark.push(i); });
+        g.ids.forEach((i, k) => { rows.push({ id: i, depth: 0, dir: false, flat: true, sub: `${k === 0 ? t('Oldest copy') : t('Copy')} · ${tree.rel(tree.parent[i])}` }); mark.push(i); });
       }
-      const sub = dupes.status === 'running' ? `Comparing file contents… ${Math.floor(dupes.pct * 100)}%` : dupes.status === 'error' ? 'Duplicate search failed' : `${plural(dg.length, 'group')} · ${fmtBytes(dg.reduce((a, g) => a + g.wasted, 0))} in extra copies`;
-      return { title: 'Duplicates', sub, rows, mark };
+      const sub = dupes.status === 'running' ? t('Comparing file contents… {pct}%', { pct: Math.floor(dupes.pct * 100) }) : dupes.status === 'error' ? t('Duplicate search failed') : t('{n, plural, one {# group} other {# groups}} · {size} in extra copies', { n: dg.length, size: fmtBytes(dg.reduce((a, g) => a + g.wasted, 0)) });
+      return { title: t('Duplicates'), sub, rows, mark };
     }
     if (p === 'caches' || p === 'dev') {
       const items = cleanup.items.filter((i) => i.cat === (p === 'caches' ? 'cache' : 'dev'));
@@ -291,9 +293,9 @@ export function Explorer() {
       const mark = [];
       for (const it of items) for (const i of it.nodes) { rows.push({ id: i, depth: 0, dir: tree.isDir(i), flat: true, label: it.nodes.length > 1 ? `${tree.name(i)}` : it.name, sub: tree.rel(i) }); mark.push(i); }
       rows.sort((a, b) => tree.size[b.id] - tree.size[a.id]);
-      return { title: p === 'caches' ? 'Caches & temp' : 'Dev artifacts', sub: `${plural(items.length, 'suggestion')} · ${fmtBytes(catBytes(p === 'caches' ? 'cache' : 'dev'))}`, rows, mark };
+      return { title: p === 'caches' ? t('Caches & temp') : t('Dev artifacts'), sub: `${t('{n, plural, one {# suggestion} other {# suggestions}}', { n: items.length })} · ${fmtBytes(catBytes(p === 'caches' ? 'cache' : 'dev'))}`, rows, mark };
     }
-    return { title: 'Folders', sub: `${tree.path(zoom)} · sorted by size`, rows: treeRows(tree, zoom, ex.open, ex.more), mark: null };
+    return { title: t('Folders'), sub: t('{path} · sorted by size', { path: tree.path(zoom) }), rows: treeRows(tree, zoom, ex.open, ex.more), mark: null };
   }, [tree, v, ex.panel, ex.query, zoom, ex.open, ex.more, smart, dg, dupes.status, Math.floor(dupes.pct * 20), cleanup.items]);
 
   const markArr = useMemo(() => {
@@ -310,7 +312,7 @@ export function Explorer() {
   // Legend: bytes per type under the zoomed folder.
   const legend = useMemo(() => {
     const tb = tree.typesUnder(zoom);
-    const list = [...tb.keys()].filter((t) => tb[t] > 0).sort((a, b) => tb[b] - tb[a]);
+    const list = [...tb.keys()].filter((k) => tb[k] > 0).sort((a, b) => tb[b] - tb[a]);
     return { list, tb, max: list.length ? tb[list[0]] : 1, sum: tb.reduce((a, x) => a + x, 0) };
   }, [tree, v, zoom]);
 
@@ -324,13 +326,14 @@ export function Explorer() {
   const used = drive ? drive.total - drive.free : h.total - h.free;
   const free = drive ? drive.free : h.free;
   const dupeValue = dupes.status === 'running' ? `${Math.floor(dupes.pct * 100)}%` : dupes.status === 'pending' ? '…' : dupes.status === 'error' ? '—' : compact(dg.reduce((a, g) => a + g.wasted, 0));
+  const VIEWS = views();
   const viewInfo = VIEWS.find((x) => x.id === view) || VIEWS[0];
 
   return html`
   <div style="min-height: 100vh; background: #0E1014; color: #E6E8EB; font-family: 'Geist', system-ui, sans-serif; font-size: 14px; display: flex; flex-direction: column">
 
     <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 12px 20px; border-bottom: 1px solid #22262D; background: #12151A">
-      <a href="#" onClick=${(e) => { e.preventDefault(); A.go('start'); }} title="Back to start" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: #E6E8EB">
+      <a href="#" onClick=${(e) => { e.preventDefault(); A.go('start'); }} title=${t('Back to start')} style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: #E6E8EB">
         <${Logo} accent=${accent} />
         <span style="font-weight: 700; font-size: 17px; letter-spacing: -0.02em">Strata</span>
       </a>
@@ -338,10 +341,10 @@ export function Explorer() {
       <div style="flex: 1 1 40px"></div>
       <${SearchBox} query=${ex.query} />
       <button type="button" class="hov-ghost" onClick=${A.rescan} style="display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border-radius: 8px; border: 1px solid #333944; background: transparent; color: #E6E8EB; font-weight: 500; cursor: pointer">
-        ${Icon.rescan()} Rescan
+        ${Icon.rescan()} ${t('Rescan')}
       </button>
       <button type="button" class="hov-accent" onClick=${() => A.go('cleanup')} style="display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 16px; border-radius: 8px; border: 0; background: var(--accent); color: #0E1014; font-weight: 600; cursor: pointer">
-        ${Icon.trash()} Clean up · ${fmtBytes(queue.bytes)}
+        ${Icon.trash()} ${t('Clean up · {size}', { size: fmtBytes(queue.bytes) })}
       </button>
     </header>
 
@@ -349,14 +352,14 @@ export function Explorer() {
 
       <aside style="flex: 1 1 232px; max-width: 100%; padding: 20px 16px; border-right: 1px solid #22262D; display: flex; flex-direction: column; gap: 24px; box-sizing: border-box; background: #101317">
         <section style="display: flex; flex-direction: column; gap: 8px">
-          <h2 style="margin: 0 8px 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #8C94A0">Drives</h2>
+          <h2 style="margin: 0 8px 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #8C94A0">${t('Drives')}</h2>
           ${(drives || []).map((d) => {
             const cur = drive && d.root === drive.root;
             const u = d.total - d.free;
             const pct = d.total ? u / d.total : 0;
             const low = d.total && d.free / d.total < 0.1;
             return html`
-              <button type="button" key=${d.root} class=${cur ? '' : 'hov-ghost'} title=${cur && isDriveScan ? 'Show the whole drive' : `Scan ${d.root}`} onClick=${() => (cur && isDriveScan ? A.zoomTo(0) : A.requestScan(d.root))}
+              <button type="button" key=${d.root} class=${cur ? '' : 'hov-ghost'} title=${cur && isDriveScan ? t('Show the whole drive') : t('Scan {root}', { root: d.root })} onClick=${() => (cur && isDriveScan ? A.zoomTo(0) : A.requestScan(d.root))}
                 style=${`display: flex; flex-direction: column; gap: 8px; text-align: left; padding: 12px; border-radius: 10px; border: 1px solid ${cur ? '#2E343D' : 'transparent'}; background: ${cur ? '#181C22' : 'transparent'}; color: #E6E8EB; cursor: pointer`}>
                 <span style="display: flex; justify-content: space-between; width: 100%"><span style=${`font-weight: ${cur ? 600 : 500}`}>${driveName(d)}</span><span style=${`font-family: 'Geist Mono', monospace; font-size: 12px; color: ${low ? '#F59E0B' : '#9BA3AF'}`}>${Math.round(pct * 100)}%</span></span>
                 <span style="display: block; width: 100%; height: 6px; border-radius: 3px; background: #262B33; overflow: hidden"><span style=${`display: block; width: ${pct * 100}%; height: 100%; background: ${cur ? 'var(--accent)' : low ? '#F59E0B' : '#8C94A0'}`}></span></span>
@@ -365,40 +368,40 @@ export function Explorer() {
           })}
         </section>
         <section style="display: flex; flex-direction: column; gap: 2px">
-          <h2 style="margin: 0 8px 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #8C94A0">Smart views</h2>
-          <${SmartButton} id="largest" label="Largest files" value=${smart.largest.length} active=${ex.panel === 'largest'} />
-          <${SmartButton} id="dupes" label="Duplicates" value=${dupeValue} active=${ex.panel === 'dupes'} />
-          <${SmartButton} id="old" label="Untouched for 1 year" value=${compact(smart.old.bytes)} active=${ex.panel === 'old'} />
-          <${SmartButton} id="caches" label="Caches & temp" value=${compact(catBytes('cache'))} active=${ex.panel === 'caches'} />
-          <${SmartButton} id="dev" label="Dev artifacts" value=${compact(catBytes('dev'))} active=${ex.panel === 'dev'} />
+          <h2 style="margin: 0 8px 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #8C94A0">${t('Smart views')}</h2>
+          <${SmartButton} id="largest" label=${t('Largest files')} value=${smart.largest.length} active=${ex.panel === 'largest'} />
+          <${SmartButton} id="dupes" label=${t('Duplicates')} value=${dupeValue} active=${ex.panel === 'dupes'} />
+          <${SmartButton} id="old" label=${t('Untouched for 1 year')} value=${compact(smart.old.bytes)} active=${ex.panel === 'old'} />
+          <${SmartButton} id="caches" label=${t('Caches & temp')} value=${compact(catBytes('cache'))} active=${ex.panel === 'caches'} />
+          <${SmartButton} id="dev" label=${t('Dev artifacts')} value=${compact(catBytes('dev'))} active=${ex.panel === 'dev'} />
         </section>
         <section style="display: flex; flex-direction: column; gap: 6px; margin-top: auto; padding: 12px; border-radius: 10px; border: 1px dashed #333944">
-          <span style="font-size: 12px; color: #9BA3AF">Last scan</span>
-          <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #E6E8EB">${fmtWhen(h.scannedAt)} · ${h.duration < 60 ? `${Math.max(1, Math.round(h.duration))} s` : fmtDur(h.duration)} · ${h.method}${h.partial ? ' · partial' : ''}</span>
+          <span style="font-size: 12px; color: #9BA3AF">${t('Last scan')}</span>
+          <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #E6E8EB">${fmtWhen(h.scannedAt)} · ${h.duration < 60 ? `${Math.max(1, Math.round(h.duration))} s` : fmtDur(h.duration)} · ${h.method}${h.partial ? ` · ${t('partial')}` : ''}</span>
         </section>
       </aside>
 
       <main style="flex: 999 1 560px; min-width: 0; padding: 20px; display: flex; flex-direction: column; gap: 16px; box-sizing: border-box">
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px">
-          ${isDriveScan ? html`<${Stat} label="Used" value=${used} />` : html`<${Stat} label="This folder" value=${tree.total} />`}
-          <${Stat} label=${isDriveScan ? 'Free' : 'Drive free'} value=${free} />
+          ${isDriveScan ? html`<${Stat} label=${t('Used')} value=${used} />` : html`<${Stat} label=${t('This folder')} value=${tree.total} />`}
+          <${Stat} label=${isDriveScan ? t('Free') : t('Drive free')} value=${free} />
           <div style="padding: 14px 16px; border-radius: 12px; background: #14171C; border: 1px solid #22262D; display: flex; flex-direction: column; gap: 4px">
-            <span style="font-size: 12px; color: #9BA3AF">Files · Folders</span>
+            <span style="font-size: 12px; color: #9BA3AF">${t('Files · Folders')}</span>
             <span style="font-size: 24px; font-weight: 600; letter-spacing: -0.02em">${fmtShort(tree.files[0])} <span style="font-size: 14px; color: #9BA3AF; font-weight: 500">· ${fmtShort(h.dirs)}</span></span>
           </div>
-          <${Stat} label="Reclaimable" value=${queue.bytes} accent />
+          <${Stat} label=${t('Reclaimable')} value=${queue.bytes} accent />
         </div>
 
         <section style="border-radius: 14px; background: #14171C; border: 1px solid #22262D; padding: 14px; display: flex; flex-direction: column; gap: 12px">
           <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
-            <h2 style="margin: 0; font-size: 15px; font-weight: 600">Space map</h2>
-            <span style="font-size: 12px; color: #9BA3AF">${panel.mark ? `Highlighting ${panel.title.toLowerCase()}` : ex.typeFilter >= 0 ? `Highlighting ${TYPES[ex.typeFilter].l.toLowerCase()}` : viewInfo.hint}</span>
+            <h2 style="margin: 0; font-size: 15px; font-weight: 600">${t('Space map')}</h2>
+            <span style="font-size: 12px; color: #9BA3AF">${panel.mark ? t('Highlighting {what}', { what: panel.title.toLowerCase() }) : ex.typeFilter >= 0 ? t('Highlighting {what}', { what: TYPES[ex.typeFilter].l.toLowerCase() }) : viewInfo.hint}</span>
             <div style="flex: 1 1 20px"></div>
-            <div role="group" aria-label="View" style="display: flex; padding: 3px; border-radius: 8px; background: #0E1014; border: 1px solid #262B33">
+            <div role="group" aria-label=${t('View')} style="display: flex; padding: 3px; border-radius: 8px; background: #0E1014; border: 1px solid #262B33">
               ${VIEWS.map((x) => html`<button type="button" aria-pressed=${view === x.id ? 'true' : 'false'} onClick=${() => A.setView(x.id)} style=${`height: 30px; padding: 0 12px; border: 0; border-radius: 6px; background: ${view === x.id ? '#262B33' : 'transparent'}; color: ${view === x.id ? '#E6E8EB' : '#9BA3AF'}; cursor: pointer`}>${x.label}</button>`)}
             </div>
-            <button type="button" class="hov-ghost" aria-label="Zoom out to parent" title="Zoom out to parent (Backspace)" disabled=${zoom === 0} onClick=${A.zoomOut} style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid #333944; background: transparent; color: #E6E8EB; cursor: pointer">${Icon.up()}</button>
+            <button type="button" class="hov-ghost" aria-label=${t('Zoom out to parent')} title=${t('Zoom out to parent (Backspace)')} disabled=${zoom === 0} onClick=${A.zoomOut} style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid #333944; background: transparent; color: #E6E8EB; cursor: pointer">${Icon.up()}</button>
           </div>
           <${SpaceMap} tree=${tree} version=${v} root=${zoom} view=${view} mark=${markArr} markKey=${markKey} typeFilter=${ex.typeFilter} shading=${settings.shading} sel=${sel}
             onSelect=${(i) => A.select(i)} onZoom=${A.zoomToward} onUp=${A.zoomOut} onMenu=${A.nodeMenu} />
@@ -409,16 +412,16 @@ export function Explorer() {
             <div style="display: flex; align-items: center; gap: 12px; padding: 0 8px 10px">
               <h2 style="margin: 0; font-size: 15px; font-weight: 600">${panel.title}</h2>
               <span style="font-size: 12px; color: #9BA3AF; min-width: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">${panel.sub}</span>
-              ${ex.panel !== 'folders' && html`<button type="button" class="hov-ghost" onClick=${() => A.setPanel('folders')} style="display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid #333944; background: transparent; color: #C9CED6; cursor: pointer; font-size: 12px">${Icon.close()} Back to folders</button>`}
+              ${ex.panel !== 'folders' && html`<button type="button" class="hov-ghost" onClick=${() => A.setPanel('folders')} style="display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid #333944; background: transparent; color: #C9CED6; cursor: pointer; font-size: 12px">${Icon.close()} ${t('Back to folders')}</button>`}
             </div>
             <div ref=${tableRef} style="overflow: auto; max-height: 520px">
               <div style="min-width: 480px">
                 <div style="display: grid; grid-template-columns: minmax(0, 1fr) 140px 84px 56px; gap: 12px; padding: 6px 12px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: #8C94A0; border-bottom: 1px solid #22262D; position: sticky; top: 0; background: #14171C; z-index: 1">
-                  <span>Name</span><span>Share</span><span style="text-align: right">Size</span><span style="text-align: right">%</span>
+                  <span>${t('Name')}</span><span>${t('Share')}</span><span style="text-align: right">${t('Size')}</span><span style="text-align: right">%</span>
                 </div>
-                ${panel.rows.length === 0 && html`<div style="padding: 16px 12px; color: #9BA3AF">${ex.panel === 'search' ? 'No matches. Try *.mkv, >1 GB or type:video.' : ex.panel === 'dupes' && dupes.status === 'running' ? 'Comparing file contents…' : 'Nothing here.'}</div>`}
+                ${panel.rows.length === 0 && html`<div style="padding: 16px 12px; color: #9BA3AF">${ex.panel === 'search' ? t('No matches. Try *.mkv, >1 GB or type:video.') : ex.panel === 'dupes' && dupes.status === 'running' ? t('Comparing file contents…') : t('Nothing here.')}</div>`}
                 ${panel.rows.map((r) => r.more !== undefined
-                  ? html`<div key=${`more${r.more}`} style=${`padding: 8px 12px 8px ${12 + r.depth * 22 + 22}px; border-bottom: 1px solid #1B1F25`}><button type="button" class="crumb" onClick=${() => A.showMore(r.more)} style="color: var(--accent); font-size: 13px">Show ${plural(r.count, 'more item')}…</button></div>`
+                  ? html`<div key=${`more${r.more}`} style=${`padding: 8px 12px 8px ${12 + r.depth * 22 + 22}px; border-bottom: 1px solid #1B1F25`}><button type="button" class="crumb" onClick=${() => A.showMore(r.more)} style="color: var(--accent); font-size: 13px">${t('Show {n, plural, one {# more item} other {# more items}}…', { n: r.count })}</button></div>`
                   : html`<${Row} key=${r.id} tree=${tree} r=${r} sel=${sel} accent=${accent} maxV=${maxV} total=${panel.mark ? tree.total : total} flat=${!!r.flat} />`)}
               </div>
             </div>
@@ -426,20 +429,20 @@ export function Explorer() {
 
           <section style="flex: 1 1 280px; min-width: 0; border-radius: 14px; background: #14171C; border: 1px solid #22262D; padding: 14px; display: flex; flex-direction: column; gap: 10px">
             <div style="display: flex; align-items: center; justify-content: space-between; margin: 0 0 4px">
-              <h2 style="margin: 0; font-size: 15px; font-weight: 600">By file type</h2>
-              ${ex.typeFilter >= 0 && html`<button type="button" class="crumb" onClick=${() => A.setTypeFilter(ex.typeFilter)} style="font-size: 12px; color: var(--accent)">Show all</button>`}
+              <h2 style="margin: 0; font-size: 15px; font-weight: 600">${t('By file type')}</h2>
+              ${ex.typeFilter >= 0 && html`<button type="button" class="crumb" onClick=${() => A.setTypeFilter(ex.typeFilter)} style="font-size: 12px; color: var(--accent)">${t('Show all')}</button>`}
             </div>
-            ${legend.list.map((t) => html`
-              <div key=${t} class=${`hov-legend${ex.typeFilter >= 0 && ex.typeFilter !== t ? ' off' : ''}`} role="button" tabindex="0" aria-pressed=${ex.typeFilter === t ? 'true' : 'false'} title=${`Highlight ${TYPES[t].l.toLowerCase()} on the map`}
-                onClick=${() => A.setTypeFilter(t)} onKeyDown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); A.setTypeFilter(t); } }}
+            ${legend.list.map((k) => html`
+              <div key=${k} class=${`hov-legend${ex.typeFilter >= 0 && ex.typeFilter !== k ? ' off' : ''}`} role="button" tabindex="0" aria-pressed=${ex.typeFilter === k ? 'true' : 'false'} title=${t('Highlight {type} on the map', { type: TYPES[k].l.toLowerCase() })}
+                onClick=${() => A.setTypeFilter(k)} onKeyDown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); A.setTypeFilter(k); } }}
                 style="display: flex; flex-direction: column; gap: 6px">
                 <div style="display: flex; align-items: center; gap: 8px">
-                  <span style=${`width: 10px; height: 10px; border-radius: 3px; background: ${TYPES[t].c}`}></span>
-                  <span style="flex: 1; color: #C9CED6">${TYPES[t].l}</span>
-                  <span style="font-family: 'Geist Mono', monospace; font-size: 12px">${fmtBytes(legend.tb[t])}</span>
-                  <span style="width: 44px; text-align: right; font-family: 'Geist Mono', monospace; font-size: 12px; color: #9BA3AF">${fmtPct(legend.tb[t], legend.sum, 0)}</span>
+                  <span style=${`width: 10px; height: 10px; border-radius: 3px; background: ${TYPES[k].c}`}></span>
+                  <span style="flex: 1; color: #C9CED6">${TYPES[k].l}</span>
+                  <span style="font-family: 'Geist Mono', monospace; font-size: 12px">${fmtBytes(legend.tb[k])}</span>
+                  <span style="width: 44px; text-align: right; font-family: 'Geist Mono', monospace; font-size: 12px; color: #9BA3AF">${fmtPct(legend.tb[k], legend.sum, 0)}</span>
                 </div>
-                <span style="display: block; height: 4px; border-radius: 2px; background: #22262D; overflow: hidden"><span style=${`display: block; height: 100%; width: ${legend.tb[t] / legend.max * 100}%; background: ${TYPES[t].c}`}></span></span>
+                <span style="display: block; height: 4px; border-radius: 2px; background: #22262D; overflow: hidden"><span style=${`display: block; height: 100%; width: ${legend.tb[k] / legend.max * 100}%; background: ${TYPES[k].c}`}></span></span>
               </div>`)}
           </section>
         </div>

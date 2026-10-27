@@ -4,6 +4,7 @@ import { html } from '../lib/html.js';
 import { LAYOUTS, layoutTreemap } from './layouts.js';
 import { hover } from '../lib/store.js';
 import { fmtBytes } from '../lib/format.js';
+import { t } from '../lib/i18n.js';
 
 function useSize(ref) {
   const [size, setSize] = useState({ w: 0, h: 0 });
@@ -115,7 +116,7 @@ export function SpaceMap({ tree, version, root, view, mark, markKey, typeFilter,
   return html`
     <div ref=${wrap} onMouseLeave=${onLeave} style="position: relative; width: 100%; height: 520px; border-radius: 8px; overflow: hidden; background: #0B0D10">
       <canvas ref=${base} class="map-canvas" aria-hidden="true"></canvas>
-      <canvas ref=${over} class="map-canvas" role="img" aria-label="Space map" onMouseMove=${onMove} onClick=${onClick} onDblClick=${onDbl} onContextMenu=${onCtx}></canvas>
+      <canvas ref=${over} class="map-canvas" role="img" aria-label=${t('Space map')} onMouseMove=${onMove} onClick=${onClick} onDblClick=${onDbl} onContextMenu=${onCtx}></canvas>
       ${tip && html`<div class="map-tip" style=${`left:${tip.x}px;top:${tip.y}px`}>${tip.text}</div>`}
     </div>`;
 }
