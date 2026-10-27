@@ -1,0 +1,101 @@
+@font-face {
+  font-family: 'Geist';
+  src: url('fonts/Geist-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('fonts/GeistMono-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: block;
+}
+
+:root {
+  --accent: #C6F432;
+  --accent-hover: color-mix(in srgb, var(--accent) 62%, white);
+  color-scheme: dark;
+}
+
+html, body { margin: 0; background: #0E1014; min-height: 100%; }
+body { font-family: 'Geist', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); }
+a:hover { color: var(--accent-hover); }
+button { font: inherit; }
+input::placeholder { color: #7B8390; }
+input[type="checkbox"] { accent-color: var(--accent); }
+::selection { background: color-mix(in srgb, var(--accent) 35%, transparent); }
+
+@keyframes strata-pulse { 0%, 100% { opacity: .35; } 50% { opacity: .7; } }
+@keyframes strata-live { 0%, 100% { opacity: .78; } 50% { opacity: 1; } }
+@keyframes strata-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes strata-spin { to { transform: rotate(360deg); } }
+
+/* Hover and focus affordances (the design's inline styles carry the resting state). */
+.hov-ghost:hover:not(:disabled) { background: #181C22 !important; }
+.hov-quiet:hover:not(:disabled) { background: #161A20 !important; color: #E6E8EB !important; }
+.hov-card:hover { border-color: #3A404A !important; }
+.hov-card-accent:hover { border-color: var(--accent-hover) !important; }
+.hov-accent:hover:not(:disabled) { filter: brightness(1.08); }
+.hov-danger:hover:not(:disabled) { background: rgba(255, 154, 162, .08) !important; }
+.hov-row:hover { background: #171B21; }
+.hov-row.sel, .hov-row.sel:hover { background: #1E232A; }
+.hov-link { color: #C9CED6 !important; }
+.hov-link:hover { color: #E6E8EB !important; }
+.hov-legend { cursor: pointer; border-radius: 8px; margin: -4px -6px; padding: 4px 6px; }
+.hov-legend:hover { background: #181C22; }
+.hov-legend.off { opacity: .38; }
+.crumb { cursor: pointer; border: 0; background: transparent; padding: 0; font: inherit; color: inherit; }
+.crumb:hover { color: #E6E8EB; text-decoration: underline; text-underline-offset: 3px; }
+
+button:disabled { opacity: .45; cursor: default !important; }
+:is(button, a, input, [tabindex]):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #262B33; border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: #333944; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+
+/* Modals */
+.backdrop {
+  position: fixed; inset: 0; z-index: 50; background: rgba(5, 6, 8, .62);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+  animation: strata-fade .12s ease-out;
+}
+.dialog {
+  width: 100%; max-width: 480px; max-height: calc(100vh - 40px); overflow: auto; box-sizing: border-box;
+  background: #14171C; border: 1px solid #262B33; border-radius: 14px; padding: 22px;
+  color: #E6E8EB; font-size: 14px; box-shadow: 0 24px 60px rgba(0, 0, 0, .5);
+  display: flex; flex-direction: column; gap: 16px;
+}
+.dialog h2 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+.dialog p { margin: 0; color: #9BA3AF; line-height: 1.5; }
+.dialog .actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; margin-top: 4px; }
+.btn { height: 40px; padding: 0 16px; border-radius: 10px; font-weight: 500; cursor: pointer; border: 1px solid #333944; background: transparent; color: #E6E8EB; }
+.btn.primary { background: var(--accent); border-color: transparent; color: #0E1014; font-weight: 600; }
+.btn.danger { background: #FF9AA2; border-color: transparent; color: #2A0A0E; font-weight: 600; }
+.btn.quiet { border-color: transparent; color: #C9CED6; }
+.btn:hover:not(:disabled) { background: #181C22; }
+.btn.primary:hover:not(:disabled), .btn.danger:hover:not(:disabled) { filter: brightness(1.08); background: var(--accent); }
+.btn.danger:hover:not(:disabled) { background: #FF9AA2; }
+
+.toast {
+  position: fixed; left: 50%; bottom: 52px; transform: translateX(-50%); z-index: 60;
+  background: #1E232A; border: 1px solid #333944; color: #E6E8EB; border-radius: 10px;
+  padding: 10px 16px; font-size: 13px; box-shadow: 0 10px 30px rgba(0, 0, 0, .45); animation: strata-fade .15s ease-out;
+  max-width: min(640px, calc(100vw - 40px));
+}
+
+.dropzone {
+  position: fixed; inset: 12px; z-index: 40; border: 2px dashed var(--accent); border-radius: 18px;
+  background: rgba(14, 16, 20, .82); display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; color: #E6E8EB; font-size: 20px; font-weight: 600; pointer-events: none;
+}
+
+.spinner { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #333944; border-top-color: var(--accent); animation: strata-spin .8s linear infinite; display: inline-block; }
+
+.map-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.map-tip {
+  position: absolute; pointer-events: none; z-index: 3; background: rgba(14, 16, 20, .92); border: 1px solid #333944;
+  border-radius: 8px; padding: 6px 9px; font-size: 12px; color: #E6E8EB; white-space: nowrap; max-width: 420px; overflow: hidden; text-overflow: ellipsis;
+}

@@ -1,0 +1,100 @@
+{
+  "name": "strata",
+  "productName": "Strata",
+  "version": "0.1.0",
+  "description": "See what fills your disk, then clean it up. A fast, modern disk space analyzer for Windows.",
+  "keywords": [
+    "disk-space",
+    "disk-usage",
+    "treemap",
+    "windirstat",
+    "cleanup",
+    "ntfs",
+    "mft",
+    "electron",
+    "windows"
+  ],
+  "homepage": "https://github.com/florentvdry/strata#readme",
+  "bugs": {
+    "url": "https://github.com/florentvdry/strata/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/florentvdry/strata.git"
+  },
+  "license": "MIT",
+  "author": "Florent Vandroy",
+  "main": "src/main/main.js",
+  "private": true,
+  "scripts": {
+    "postinstall": "node node_modules/electron/install.js",
+    "start": "node scripts/build-scanner.js --if-missing && electron .",
+    "build:scanner": "node scripts/build-scanner.js",
+    "build:icon": "node scripts/make-icon.js",
+    "pack": "node scripts/build-scanner.js && electron-builder --win --dir",
+    "dist": "node scripts/build-scanner.js && electron-builder --win --publish never",
+    "screenshots": "node scripts/screenshots/capture.mjs"
+  },
+  "dependencies": {
+    "htm": "^3.1.1",
+    "preact": "^10.26.0"
+  },
+  "devDependencies": {
+    "electron": "^45.0.0",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "io.github.florentvdry.strata",
+    "productName": "Strata",
+    "copyright": "Copyright © 2026 Florent Vandroy",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "src/**/*",
+      "assets/icon.png",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "bin/StrataScan.exe",
+        "to": "StrataScan.exe"
+      }
+    ],
+    "asar": true,
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Strata",
+      "license": "LICENSE",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "uninstallDisplayName": "Strata",
+      "artifactName": "Strata-Setup-${version}.exe"
+    },
+    "portable": {
+      "artifactName": "Strata-${version}-Portable.exe"
+    }
+  }
+}
