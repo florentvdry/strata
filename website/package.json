@@ -11,5 +11,9 @@
   "dependencies": {
     "nuxt": "^3.17.0",
     "vue": "latest"
+  },
+  "devDependencies": {
+    "cac": "^6.7.14",
+    "commander": "^15.0.0"
   }
 }
