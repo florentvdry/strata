@@ -30,7 +30,8 @@ function keys() {
   return [...found].sort();
 }
 
-const names = (s) => [...s.matchAll(/\{\s*(\w+)\s*[,}]/g)].map((m) => m[1]).sort().join(',');
+// Which placeholders a text uses. Plural branches repeat them, and a language with fewer branches repeats them less.
+const names = (s) => [...new Set([...s.matchAll(/\{\s*(\w+)\s*[,}]/g)].map((m) => m[1]))].sort().join(',');
 
 if (process.argv.includes('--keys')) {
   console.log(JSON.stringify(keys(), null, 2));
