@@ -5,6 +5,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Changed
+
+- Updated Preact to 11. The UI now loads its ES module builds (`.mjs`).
+
+### Added
+
+- `npm run check`, run in CI, verifies that every file in the UI's import map exists and that the Content-Security-Policy hash matches it. A mismatch would otherwise leave the window blank without any build error.
+
 ## [0.1.0] - 2026-10-27
 
 First public release.

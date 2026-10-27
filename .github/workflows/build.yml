@@ -27,6 +27,9 @@ jobs:
         shell: bash
         run: for f in $(find src -name '*.js'); do node --check "$f"; done
 
+      - name: Check import map and CSP hash
+        run: npm run check
+
       - name: Build installer and portable app
         run: npm run dist
 

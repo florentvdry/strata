@@ -56,10 +56,11 @@ If Electron didn't download during `npm install` (newer npm versions can block i
 
 There's no automated UI test suite yet, so please check your change by hand. A good minimum:
 
-1. `npm start`, then scan a small folder and a drive. Try both normal and, if you can, fast scan as administrator.
-2. Exercise what you touched: the map views, search, smart views, cleanup selection.
-3. For deletion changes, use a throwaway folder: recycle, delete permanently, a file that's in use, a path longer than 260 characters.
-4. `npm run pack` and run `dist/win-unpacked/Strata.exe` to make sure the packaged build works.
+1. `npm run check` if you touched dependencies or `src/renderer/index.html`. The UI loads Preact and htm through an import map protected by a CSP hash, and `node scripts/check-renderer.js --fix` updates that hash after you edit the map.
+2. `npm start`, then scan a small folder and a drive. Try both normal and, if you can, fast scan as administrator.
+3. Exercise what you touched: the map views, search, smart views, cleanup selection.
+4. For deletion changes, use a throwaway folder: recycle, delete permanently, a file that's in use, a path longer than 260 characters.
+5. `npm run pack` and run `dist/win-unpacked/Strata.exe` to make sure the packaged build works.
 
 If your change affects how a screen looks, run `npm run screenshots` and commit the updated images.
 

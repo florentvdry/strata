@@ -29,6 +29,7 @@
   "scripts": {
     "postinstall": "node node_modules/electron/install.js",
     "start": "node scripts/build-scanner.js --if-missing && electron .",
+    "check": "node scripts/check-renderer.js",
     "build:scanner": "node scripts/build-scanner.js",
     "build:icon": "node scripts/make-icon.js",
     "pack": "node scripts/build-scanner.js && electron-builder --win --dir",
