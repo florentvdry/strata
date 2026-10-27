@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-27
+
 ### Fixed
 
 - A finished scan no longer stays stuck on "100%": the map now opens as soon as the scan ends. If loading the results ever fails, Strata shows the error instead of freezing.
@@ -86,6 +88,7 @@ First public release.
 - **Settings:** accent color, cushion shading, restart as administrator, clear recent scans.
 - Windows installer (per-user) and a single-file portable version that keeps its data next to the `.exe`.
 
-[Unreleased]: https://github.com/florentvdry/strata/compare/v0.2.0-beta.1...HEAD
+[Unreleased]: https://github.com/florentvdry/strata/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/florentvdry/strata/compare/v0.2.0-beta.1...v0.2.0
 [0.2.0-beta.1]: https://github.com/florentvdry/strata/compare/v0.1.0...v0.2.0-beta.1
 [0.1.0]: https://github.com/florentvdry/strata/releases/tag/v0.1.0
