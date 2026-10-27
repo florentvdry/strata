@@ -1,5 +1,6 @@
-// Compiles scanner/StrataScan.cs with the C# compiler that ships with Windows (.NET Framework 4.x).
-// Elsewhere there is nothing to build: Linux uses scanner/linux/strata-scan.js, run by Electron's Node.js.
+// Compiles the C# scanner that the Rust one replaces (scanner/StrataScan.cs) with the C# compiler that ships with
+// Windows (.NET Framework 4.x), into bin/StrataScan.exe. Only used to compare the two (scripts/parity.js, CI);
+// the app uses bin/strata-scan.exe (scripts/build-scanner.js). On Linux the old scanner is plain JavaScript.
 const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');

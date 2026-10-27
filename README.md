@@ -159,7 +159,10 @@ Strata deletes files, so it's careful about it:
 
 ## Building from source
 
-Prerequisites: Windows 10/11 or Linux, [Node.js](https://nodejs.org) 20 or newer (22+ for `npm run screenshots`), Git. No .NET SDK needed: on Windows the scanner compiles with the C# compiler that ships with Windows (.NET Framework 4.x), and on Linux it's plain JavaScript run by Electron.
+Prerequisites: Windows 10/11 or Linux, [Node.js](https://nodejs.org) 20 or newer (22+ for `npm run screenshots`), Git, and [Rust](https://rustup.rs) for the scanner:
+
+- **Windows:** `rustup` with the default `x86_64-pc-windows-msvc` toolchain, which needs the [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) ("Desktop development with C++"). The rustup installer offers to set them up.
+- **Linux:** `rustup`, plus `rustup target add x86_64-unknown-linux-musl` and your distribution's `musl-tools` (or `musl-gcc`) for the static binary that runs everywhere. Without them, the scanner is built for your own system only.
 
 ```bash
 git clone https://github.com/florentvdry/strata.git
@@ -171,12 +174,14 @@ npm start
 | Script | Does |
 |---|---|
 | `npm start` | Builds the scanner if needed and runs the app |
-| `npm run build:scanner` | Compiles `scanner/StrataScan.cs` → `bin/StrataScan.exe` |
+| `npm run build:scanner` | Builds the scanner (`scanner/`, Rust) → `bin/strata-scan(.exe)` |
 | `npm run dist` | Builds the installer and portable `.exe` into `dist/` |
 | `npm run pack` | Builds an unpacked app into `dist/win-unpacked/` (quick to test) |
 | `npm run dist:linux` | Builds the AppImage, `.deb`, `.rpm`, `.pacman` and `.tar.gz` into `dist/` (the `.rpm` needs `rpmbuild`, the `.pacman` needs `bsdtar`) |
 | `npm run pack:linux` | Builds an unpacked Linux app into `dist/linux-unpacked/` |
-| `npm run test:scanner` | Runs the Linux scanner against a temporary folder tree |
+| `npm run test:rust` | The scanner's unit tests, including the NTFS fast scan on disk images |
+| `npm run test:scanner` | Runs the built scanner against a temporary folder tree: scan, pause, snapshot, duplicates, Recycle Bin / Trash, restore |
+| `npm run parity -- <old scanner>` | Compares `bin/strata-scan` with the scanner it replaced (`bin/StrataScan.exe` from `npm run build:legacy-scanner`, or `scanner/linux/strata-scan.js`) item by item |
 | `npm run screenshots` | Regenerates `docs/screenshots/` from a made-up drive |
 | `npm run build:icon` | Redraws `assets/icon.png` and `assets/icon.ico` |
 
@@ -187,19 +192,22 @@ npm start
 
 ```
 strata/
-├─ scanner/StrataScan.cs     Windows scanner: folder walk, NTFS MFT reader, duplicate finder, deletion
-├─ scanner/linux/            Linux scanner: same protocol, mounted drives, freedesktop.org Trash
+├─ scanner/                  The scanner (Rust), for Windows and Linux: folder walk, NTFS MFT reader,
+│  │                         duplicate finder, Recycle Bin / Trash, deletion
+│  ├─ src/platform/          What differs between Windows and Linux
+│  ├─ tests/fixtures/        NTFS disk images for the fast-scan tests
+│  └─ fuzz/                  Fuzz targets for the NTFS reader
 ├─ src/main/                 Electron main process: window, scanner processes, files, settings, history
 ├─ src/renderer/             UI, Preact + htm with no build step
 │  ├─ views/                 Start, Scanning, Explorer, Cleanup
 │  ├─ components/            Space map (treemap, sunburst, columns), dialogs, icons
 │  └─ lib/                   Scan file parser and tree model, search, cleanup rules, formatting
-├─ scripts/                  Scanner build, icon, screenshots
+├─ scripts/                  Scanner build and tests, icon, screenshots
 ├─ assets/                   App icon
 └─ docs/                     Architecture notes and screenshots
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit together: the scanner protocol, the scan file format, the MFT reader and the deletion pipeline.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit together, and [docs/PROTOCOL.md](docs/PROTOCOL.md) for the scanner's commands, messages and scan file format.
 
 ## Where Strata keeps its data
 

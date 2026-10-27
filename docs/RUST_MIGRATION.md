@@ -1,5 +1,32 @@
 # Plan : un seul scanner en Rust pour Windows et Linux
 
+## État (octobre 2026)
+
+Le plan est implémenté sur la branche `claude/quirky-gates-ytqdj0`, phases 0 à 6 et le début de la phase 7 (version `0.2.0-beta.1`). Ce qui reste demande des machines réelles ou des retours d'utilisateurs :
+
+- les vérifications manuelles de la phase 6 (Windows 10/11, Ubuntu, Fedora, Arch) ;
+- la publication de la bêta, puis la suppression de `scanner/StrataScan.cs` et `scanner/linux/` (phase 7, étape 2).
+
+Écarts avec le plan, décidés pendant l'implémentation :
+
+| Plan | Fait | Pourquoi |
+|---|---|---|
+| crate `windows` | `windows-sys` | même éditeur (Microsoft), appels bruts plus légers ; le code n'a besoin d'aucune abstraction COM |
+| `rustix` | `libc` | `fdopendir`/`readdir`/`fstatat` suffisent ; une dépendance de moins |
+| `getdents64` + `statx` | `readdir` + `fstatat` relatifs au dossier ouvert | même gain (aucun chemin reconstruit), API plus simple ; `readdir` utilise `getdents64` |
+| `percent-encoding` | 20 lignes dans `trash.rs` | même comportement qu'`encodeURIComponent`, testé |
+| `panic = "abort"` | `panic = "unwind"` + `catch_unwind` | un bug donne un message `error` affichable au lieu d'un arrêt silencieux |
+| fixture créée sous Windows (VHD) | images créées sous Linux avec `mkntfs` + `ntfs-3g` (`scanner/tests/make-ntfs-fixture.py`), régénérées en CI | reproductible sans Windows ; couvre noms 8.3, ADS, creux, compressés, jonction, liens physiques, `$ATTRIBUTE_LIST`, MFT fragmentée ; la CI Windows compare en plus MFT et parcours sur un vrai `C:` |
+| ne pas traverser si `dev` diffère | points de montage lus dans `mountinfo` | même comportement que l'ancien scanner : les sous-volumes btrfs (autre `dev`, même système de fichiers) restent comptés |
+| `trash-list` → `location` | `info` + `data` | `restore` reçoit le fichier `info` ; `data` sert aux vérifications |
+| table des types identique à `types.js` | `types.js` n'est qu'un sous-ensemble d'affichage : le test vérifie que chaque extension qu'il connaît a la même catégorie (« ts » retiré des vidéos dans l'UI) | |
+
+Différences de comportement assumées, visibles dans les comparaisons :
+
+- les noms non UTF-8 sous Linux sont comptés (l'ancien scanner JS les ignorait) ;
+- `BusName` corrigé : 4 = FireWire, 6 = Fibre Channel (l'ancien code affichait FireWire pour 6) ;
+- un dossier supprimé pendant un scan Windows est ignoré au lieu d'être compté comme erreur.
+
 ## Objectif
 
 Aujourd'hui, Strata a **deux scanners** qui font la même chose :

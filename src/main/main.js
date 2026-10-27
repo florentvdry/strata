@@ -7,16 +7,12 @@ const os = require('os');
 const readline = require('readline');
 const { spawn, execFile } = require('child_process');
 
+const platform = require('./platform');
+
+const { IS_WIN, fold } = platform;
 const ROOT = path.join(__dirname, '..', '..');
-const IS_WIN = process.platform === 'win32';
-// Windows: StrataScan.exe (C#). Linux: scanner/linux/strata-scan.js, run by Electron's own Node.js.
-const SCANNER_DIR = app.isPackaged ? path.join(process.resourcesPath, 'scanner') : path.join(ROOT, 'scanner', 'linux');
-const SCANNER = IS_WIN
-  ? (app.isPackaged ? path.join(process.resourcesPath, 'StrataScan.exe') : path.join(ROOT, 'bin', 'StrataScan.exe'))
-  : path.join(SCANNER_DIR, 'strata-scan.js');
-const trash = IS_WIN ? null : require(path.join(SCANNER_DIR, 'trash.js'));
-// Paths are case-insensitive on Windows only.
-const fold = IS_WIN ? (s) => s.toLowerCase() : (s) => s;
+// The scanner (scanner/, Rust): bin/ in development, next to the app's resources once packaged.
+const SCANNER = path.join(app.isPackaged ? process.resourcesPath : path.join(ROOT, 'bin'), platform.SCANNER_NAME);
 
 // The portable build keeps its data next to the .exe; STRATA_DATA_DIR overrides both (used for screenshots).
 const PORTABLE_DIR = process.env.PORTABLE_EXECUTABLE_DIR;
@@ -97,9 +93,7 @@ function send(channel, payload) {
 
 function runHelper(args, onLine, onSpawn) {
   return new Promise((resolve, reject) => {
-    const proc = IS_WIN
-      ? spawn(SCANNER, args, { windowsHide: true })
-      : spawn(process.execPath, [SCANNER, ...args], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', NODE_OPTIONS: '' } });
+    const proc = spawn(SCANNER, args, { windowsHide: true });
     if (onSpawn) onSpawn(proc);
     const rl = readline.createInterface({ input: proc.stdout });
     let err = '';
@@ -116,9 +110,9 @@ function runHelper(args, onLine, onSpawn) {
 let driveCache = null;
 async function getInfo(force) {
   if (driveCache && !force && Date.now() - driveCache.at < 8000) return driveCache.value;
-  let value = { admin: false, drives: [] };
+  let value = { admin: false, drives: [], trashDirs: [] };
   await runHelper(['info'], (msg) => { if (msg.type === 'info') value = msg; });
-  value.drives.sort((a, b) => (IS_WIN ? a.letter.localeCompare(b.letter) : a.root.localeCompare(b.root)));
+  platform.sortDrives(value.drives);
   driveCache = { at: Date.now(), value };
   return value;
 }
@@ -265,23 +259,12 @@ ipcMain.handle('dupes:find', async (e, { id, groups }) => {
 // ───────────── files ─────────────
 
 function protectedPaths() {
-  const env = process.env;
-  if (!IS_WIN) {
-    const home = os.homedir();
-    const list = ['/home', '/root', '/usr', '/etc', '/bin', '/sbin', '/lib', '/lib32', '/lib64', '/libx32', '/boot', '/var', '/var/lib', '/opt',
-      '/srv', '/media', '/mnt', '/run', '/tmp', '/var/tmp', '/proc', '/sys', '/dev', '/snap', home, path.join(home, '.config'),
-      path.join(home, '.local'), path.join(home, '.local', 'share'), path.join(home, '.cache'), trash.homeTrash()];
-    for (const d of (driveCache && driveCache.value.drives) || []) list.push(d.root); // mount points
-    return list.map((p) => path.resolve(p));
-  }
-  const list = [env.WINDIR, env.SystemRoot && path.join(env.SystemRoot, 'System32'), env.ProgramFiles, env['ProgramFiles(x86)'], env.ProgramData,
-    env.USERPROFILE, env.APPDATA, env.LOCALAPPDATA, path.join(env.SystemDrive || 'C:', 'Users'), path.join(env.LOCALAPPDATA || '', 'Temp')];
-  return list.filter(Boolean).map((p) => path.resolve(p).toLowerCase());
+  return platform.protectedPaths(driveCache && driveCache.value);
 }
 
 function isProtected(p) {
   const r = fold(path.resolve(p));
-  if (IS_WIN ? /^[a-z]:\\?$/.test(r) : r === '/') return true; // drive roots
+  if (platform.isDriveRoot(r)) return true;
   return protectedPaths().includes(r);
 }
 
@@ -305,6 +288,7 @@ async function expandTargets(targets) {
 }
 
 ipcMain.handle('fs:delete', async (e, { targets, permanent }) => {
+  try { await getInfo(); } catch { /* protected paths without the drive list */ }
   const { paths, owner } = await expandTargets(targets);
   const results = targets.map((t) => ({ path: t.path, ok: true, remaining: 0, errors: 0, error: null, protected: !t.contentsOnly && isProtected(t.path) }));
   for (const r of results) if (r.protected) { r.ok = false; r.error = 'Protected system location'; r.remaining = -1; }
@@ -357,11 +341,11 @@ ipcMain.handle('menu:node', (e, spec) => new Promise((resolve) => {
   const item = (id, label, extra = {}) => ({ label, click: () => { chosen = id; }, ...extra });
   const template = [
     ...(spec.isDir ? [item('zoom', 'Zoom in', { enabled: !!spec.canZoom })] : [item('open', 'Open')]),
-    item('show', IS_WIN ? 'Show in Explorer' : 'Show in file manager'),
+    item('show', platform.LABELS.show),
     item('copy', 'Copy path'),
     { type: 'separator' },
     item('cleanup', spec.inCleanup ? 'Remove from cleanup' : 'Add to cleanup', { enabled: !spec.isRoot }),
-    item('trash', IS_WIN ? 'Move to Recycle Bin' : 'Move to Trash', { enabled: !spec.isRoot }),
+    item('trash', platform.LABELS.trash, { enabled: !spec.isRoot }),
   ];
   Menu.buildFromTemplate(template).popup({ window: win, callback: () => resolve(chosen) });
 }));
@@ -373,35 +357,10 @@ function pruneHistory(list) {
   return list.filter((h) => h.at >= cutoff);
 }
 
-// Recycle Bin entries: $I files hold the original path, $R files the content.
-async function recycleEntries(drive) {
-  const bin = `${drive}\\$Recycle.Bin`;
-  const out = [];
-  let sids = [];
-  try { sids = await fsp.readdir(bin); } catch { return out; }
-  for (const sid of sids) {
-    const dir = path.join(bin, sid);
-    let names = [];
-    try { names = await fsp.readdir(dir); } catch { continue; }
-    for (const n of names) {
-      if (!n.startsWith('$I')) continue;
-      try {
-        const b = await fsp.readFile(path.join(dir, n));
-        const version = b.readBigInt64LE(0);
-        let original;
-        if (version === 2n) { const len = b.readInt32LE(24); original = b.toString('utf16le', 28, 28 + (len - 1) * 2); }
-        else original = b.toString('utf16le', 24, 24 + 520).replace(/\0.*$/s, '');
-        const deletedAt = Number((b.readBigInt64LE(16) - 116444736000000000n) / 10000n);
-        out.push({ info: path.join(dir, n), data: path.join(dir, '$R' + n.slice(2)), original, deletedAt });
-      } catch { /* unreadable entry */ }
-    }
-  }
-  return out;
-}
-
+// Recycle Bin / Trash items that may be what a history entry deleted (the scanner reads $I or .trashinfo files).
 async function inBin(h) {
-  // Linux: the freedesktop.org Trash (.trashinfo files say where each item came from).
-  const entries = IS_WIN ? await recycleEntries(h.path.slice(0, 2)) : trash.trashEntries(h.path);
+  const entries = [];
+  await runHelper(['trash-list', h.path], (msg) => { if (msg.type === 'entry') entries.push(msg); });
   const want = fold(h.path);
   return entries.filter((en) => {
     const o = fold(en.original);
@@ -425,16 +384,14 @@ ipcMain.handle('history:restore', async (e, id) => {
   const hist = readJson(HISTORY, []);
   const h = hist.find((x) => x.id === id);
   if (!h) throw new Error('Not found in history');
-  const entries = await inBin(h);
-  if (!entries.length) throw new Error('The item is no longer in the Recycle Bin.');
+  const entries = (await inBin(h)).filter((en) => !fs.existsSync(en.original));
+  if (!entries.length) throw new Error(`The item is no longer in the ${platform.LABELS.bin}.`);
+  const list = path.join(os.tmpdir(), `strata-restore-${Date.now()}.txt`);
+  fs.writeFileSync(list, entries.map((en) => en.info).join('\n'), 'utf8');
   let restored = 0;
-  for (const en of entries) {
-    if (fs.existsSync(en.original)) continue;
-    await fsp.mkdir(path.dirname(en.original), { recursive: true });
-    await fsp.rename(en.data, en.original);
-    await fsp.unlink(en.info).catch(() => {});
-    restored++;
-  }
+  try {
+    await runHelper(['restore', list], (msg) => { if (msg.type === 'result' && msg.ok) restored++; });
+  } finally { fs.unlink(list, () => {}); }
   h.restored = true;
   writeJson(HISTORY, hist);
   return restored;

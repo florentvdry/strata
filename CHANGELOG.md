@@ -7,16 +7,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+- **One scanner for Windows and Linux, in Rust** (`scanner/`), instead of a C# scanner for Windows and a JavaScript one for Linux. Same commands, messages and scan file, so scans saved by 0.1.0 still open.
+  - Faster: about 6× on Linux on a folder of 200,000 files, and it no longer runs inside Electron's Node.js.
+  - Static binaries: no Visual C++ runtime needed on Windows, and one Linux build (musl) for every distribution.
+  - Bus and SSD/HDD come from the storage driver instead of WMI.
+  - Restoring from History asks the scanner, which now lists and restores Recycle Bin / Trash items itself (`trash-list`, `restore`).
+  - Files whose names aren't valid UTF-8 are now counted on Linux (the old scanner skipped them).
 - Updated Preact to 11. The UI now loads its ES module builds (`.mjs`).
 
 ### Added
 
 - **Linux support** for the common x64 distributions, packaged as AppImage, `.deb` (Ubuntu, Debian, Mint…), `.rpm` (Fedora, RHEL, openSUSE…), `.pacman` (Arch, Manjaro…) and `.tar.gz`, all built in CI.
-  - A Linux scanner (`scanner/linux/`) with the same protocol and scan file as the Windows one, run by Electron's own Node.js: mounted drives with bus, SSD/HDD and labels, a multi-threaded walk that stays on one file system, counts hard links once and sparse files by what they use.
+  - Linux scanning: mounted drives with bus, SSD/HDD and labels, a multi-threaded walk that stays on one file system, counts hard links once and sparse files by what they use.
   - Deleting goes to the freedesktop.org Trash, which History can restore from.
   - Linux cleanup rules: `~/.cache`, thumbnails, `/tmp` and `/var/tmp`, core dumps, APT/DNF/YUM/Pacman/Zypper package caches, Linux browser profiles and `.deb`/`.rpm`/AppImage installers in Downloads.
   - Linux paths, drive names and wording (Trash, file manager) throughout the UI; the Windows-only fast scan and admin restart are hidden.
-- `npm run test:scanner`, run in CI, checks the Linux scanner against a temporary folder tree.
+- `npm run test:scanner`, run in CI on Windows and Linux, checks the scanner against a temporary folder tree: scans, pause, snapshot, stop, duplicates, Recycle Bin / Trash, restore.
+- Scanner tests in CI: unit tests, the NTFS fast scan on disk images (made with `mkntfs`/`ntfs-3g`), a fast scan vs. folder walk comparison on a real `C:`, fuzzing of the NTFS reader, and an item-by-item comparison with the old scanners (`npm run parity`).
+- [docs/PROTOCOL.md](docs/PROTOCOL.md): the scanner's commands, messages and scan file.
 - `npm run check`, run in CI, verifies that every file in the UI's import map exists and that the Content-Security-Policy hash matches it. A mismatch would otherwise leave the window blank without any build error.
 
 ## [0.1.0] - 2026-10-27
