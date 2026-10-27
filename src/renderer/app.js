@@ -35,38 +35,23 @@ function useGlobalKeys() {
   }, []);
 }
 
-// "or drop one anywhere"
+// "or drop one anywhere": the app reports the dropped paths itself (the web view can't see them).
 function useDrop() {
   useEffect(() => {
-    let depth = 0;
+    if (!api.onFileDrop) return undefined;
     const can = () => store.state.screen !== 'scanning' && !store.state.modal;
-    const hasFiles = (e) => e.dataTransfer && [...e.dataTransfer.types].includes('Files');
-    const enter = (e) => { if (!hasFiles(e) || !can()) return; e.preventDefault(); depth++; store.set({ dragging: true }); };
-    const over = (e) => { if (hasFiles(e) && can()) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } };
-    const leave = () => { depth = Math.max(0, depth - 1); if (!depth) store.set({ dragging: false }); };
-    const drop = async (e) => {
-      e.preventDefault();
-      depth = 0;
+    return api.onFileDrop(async ({ type, paths }) => {
+      if (type === 'enter' || type === 'over') {
+        if (can() && !store.state.dragging) store.set({ dragging: true });
+        return;
+      }
       store.set({ dragging: false });
-      if (!can()) return;
-      const file = e.dataTransfer.files[0];
-      if (!file) return;
-      let p = api.pathForFile(file);
-      if (!p) return;
+      if (type !== 'drop' || !can() || !paths.length) return;
+      let p = paths[0];
       const st = await api.stat(p);
       if (st && !st.isDir) p = parentPath(p);
       A.requestScan(isWin && p.length === 2 ? p + '\\' : p);
-    };
-    window.addEventListener('dragenter', enter);
-    window.addEventListener('dragover', over);
-    window.addEventListener('dragleave', leave);
-    window.addEventListener('drop', drop);
-    return () => {
-      window.removeEventListener('dragenter', enter);
-      window.removeEventListener('dragover', over);
-      window.removeEventListener('dragleave', leave);
-      window.removeEventListener('drop', drop);
-    };
+    });
   }, []);
 }
 

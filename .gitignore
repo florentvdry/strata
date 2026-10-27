@@ -21,3 +21,6 @@ desktop.ini
 
 # Rust build output
 scanner/target/
+
+# Local copy of the update signing key (never commit it)
+.signing/

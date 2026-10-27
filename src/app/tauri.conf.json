@@ -1,0 +1,64 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Strata",
+  "identifier": "io.github.florentvdry.strata",
+  "build": {
+    "frontendDist": "../renderer"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Strata",
+        "width": 1440,
+        "height": 960,
+        "minWidth": 960,
+        "minHeight": 640,
+        "backgroundColor": "#0E1014",
+        "theme": "Dark",
+        "create": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "deb", "rpm", "appimage"],
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "copyright": "Copyright © 2026 Florent Vandroy",
+    "license": "MIT",
+    "licenseFile": "../../LICENSE",
+    "category": "Utility",
+    "shortDescription": "See what fills your disk, then clean it up",
+    "longDescription": "A fast, modern disk space analyzer for Windows and Linux: maps every file as a block sized by its bytes, suggests safe cleanups and sends them to the Recycle Bin or Trash.",
+    "publisher": "Florent Vandroy",
+    "homepage": "https://github.com/florentvdry/strata",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico",
+        "languages": ["English"],
+        "displayLanguageSelector": false
+      }
+    },
+    "linux": {
+      "deb": {
+        "depends": ["libwebkit2gtk-4.1-0", "libgtk-3-0"],
+        "section": "utils"
+      },
+      "rpm": {
+        "depends": ["webkit2gtk4.1", "gtk3"]
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFBQ0RBMjNFMEI1MEU0RDcKUldUWDVGQUxQcUxOcWlEN3dzbW91aXd6M0hjcVZqVnZrMTI3OUF2ejFSNWM3eUcwRzFoZWF4Q2IK",
+      "endpoints": ["https://github.com/florentvdry/strata/releases/latest/download/latest.json"],
+      "windows": { "installMode": "passive" }
+    }
+  }
+}

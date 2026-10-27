@@ -5,7 +5,7 @@
       <nav aria-label="Project links">
         <a :href="repo">GitHub</a>
         <a :href="`${repo}/releases`">Releases</a>
-        <a :href="`${repo}/blob/main/CHANGELOG.md`">Changelog</a>
+        <NuxtLink to="/changelog">Changelog</NuxtLink>
         <a :href="`${repo}/blob/main/docs/ARCHITECTURE.md`">Architecture</a>
         <a :href="`${repo}/blob/main/CONTRIBUTING.md`">Contributing</a>
       </nav>

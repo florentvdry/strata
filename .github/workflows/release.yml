@@ -1,0 +1,101 @@
+name: Release
+
+# Push a tag like v0.2.0 (see docs/RELEASING.md): builds and signs Windows and Linux, then publishes the
+# GitHub release with notes from CHANGELOG.md, the update manifests and SHA256SUMS.txt.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  actions: write # to start the website build once the release is out
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Tag, version and changelog agree
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
+            echo "::error::The tag is ${GITHUB_REF_NAME} but package.json says ${version}. Use: npm run release -- <version>"
+            exit 1
+          fi
+          node scripts/changelog.js check
+          node scripts/changelog.js notes "${version}" > /dev/null
+
+      - name: Update signing is set up
+        run: |
+          if grep -q '"pubkey": "REPLACE' src/app/tauri.conf.json; then
+            echo "::error::No update signing key yet. Run: npm run signing:setup (see docs/RELEASING.md)"
+            exit 1
+          fi
+          if [ -z "${SIGNING_KEY}" ]; then
+            echo "::error::The TAURI_SIGNING_PRIVATE_KEY secret is missing (see docs/RELEASING.md)."
+            exit 1
+          fi
+
+  build:
+    needs: check
+    uses: ./.github/workflows/build.yml
+    with:
+      release: true
+    secrets: inherit
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - uses: actions/download-artifact@v7
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Release notes and update manifest
+        run: |
+          version=$(node -p "require('./package.json').version")
+          node scripts/changelog.js notes "${version}" > notes.md
+          node scripts/make-update-manifest.js --notes-file notes.md
+          prev=$(git tag --list 'v*' --sort=-v:refname | sed -n '2p')
+          { cat notes.md; echo; echo '---'; echo
+            echo "SHA-256 checksums: \`SHA256SUMS.txt\`. Strata checks for updates from Settings › Updates, and verifies each one with a signature."
+            [ -n "${prev}" ] && echo "Full changelog: https://github.com/${GITHUB_REPOSITORY}/compare/${prev}...${GITHUB_REF_NAME}"
+          } > body.md
+          cat body.md
+
+      - name: Publish the GitHub release
+        run: |
+          flags=""
+          case "${GITHUB_REF_NAME}" in *-*) flags="--prerelease" ;; esac
+          files=$(ls dist/Strata-* | grep -v '\.sig$')
+          gh release create "${GITHUB_REF_NAME}" ${files} dist/latest.json dist/SHA256SUMS.txt \
+            --title "Strata ${GITHUB_REF_NAME#v}" --notes-file body.md --verify-tag ${flags}
+
+      # Beta channel: a fixed pre-release whose manifest every release (beta or stable) refreshes, because
+      # "latest" skips pre-releases. Stable channel reads the latest stable release's own latest.json.
+      - name: Refresh the beta channel manifest
+        run: |
+          gh release view channel-beta > /dev/null 2>&1 || gh release create channel-beta --prerelease \
+            --title "Beta channel" --notes "Only holds latest.json for Strata's Beta update channel. Not a release: downloads are on the numbered releases."
+          gh release upload channel-beta dist/latest.json --clobber
+
+      - name: Rebuild the website (changelog and download links)
+        run: gh workflow run website.yml --ref main

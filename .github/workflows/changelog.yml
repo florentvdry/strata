@@ -1,0 +1,29 @@
+name: Changelog
+
+# A pull request that changes the app or the scanner needs a CHANGELOG.md entry under "Unreleased"
+# (CI and tooling go under "Internal"). Add the "no-changelog" label when there is nothing to say.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  entry:
+    if: ${{ github.actor != 'dependabot[bot]' && !contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: CHANGELOG.md is part of the change
+        run: |
+          changed=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          if echo "$changed" | grep -qE '^(src/|scanner/src/)'; then
+            if ! echo "$changed" | grep -qx 'CHANGELOG.md'; then
+              echo "::error::This changes the app or the scanner but not CHANGELOG.md. Add a line under [Unreleased] (or label the PR no-changelog)."
+              exit 1
+            fi
+          fi

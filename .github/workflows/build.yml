@@ -5,9 +5,26 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  # The Release workflow builds with the same jobs, with signing on.
+  workflow_call:
+    inputs:
+      release:
+        type: boolean
+        default: false
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY:
+        required: false
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
+        required: false
 
 permissions:
   contents: read
+
+env:
+  # Makes `tauri build` write the .sig files the updater verifies (needs TAURI_SIGNING_PRIVATE_KEY).
+  TAURI_RELEASE_CONFIG: ${{ inputs.release && '--config tauri.release.conf.json' || '' }}
+  TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+  TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
 jobs:
   windows:
@@ -26,17 +43,22 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: scanner
+          workspaces: |
+            scanner
+            src/app
 
       - name: Install dependencies
         run: npm ci
 
       - name: Check renderer syntax
         shell: bash
-        run: for f in $(find src scripts -name '*.js'); do node --check "$f"; done
+        run: for f in $(find src scripts -name '*.js' -not -path '*/vendor/*'); do node --check "$f"; done
 
-      - name: Check import map and CSP hash
+      - name: Check import map, vendored libraries and changelog
         run: npm run check
+
+      - name: Test the release scripts
+        run: npm run test:scripts
 
       - name: Scanner format, lints and unit tests
         working-directory: scanner
@@ -55,20 +77,37 @@ jobs:
       - name: Fast scan finds the same tree as a folder walk
         run: node scripts/check-fast-scan.js --bench
 
-      - name: Build installer and portable app
-        run: npm run dist
+      - name: App format, lints and unit tests
+        working-directory: src/app
+        run: |
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+
+      - name: Build the installer
+        run: npx tauri build --bundles nsis ${{ env.TAURI_RELEASE_CONFIG }}
+        working-directory: src/app
+
+      - name: Smoke test the built app
+        run: node scripts/smoke-test.js
+
+      - name: Package installer and portable app
+        run: node scripts/package-release.js
 
       - uses: actions/upload-artifact@v7
         with:
           name: strata-windows
           path: |
-            dist/Strata-Setup-*.exe
-            dist/Strata-*-Portable.exe
+            dist/Strata-Setup-*.exe*
+            dist/Strata-*-Portable.exe*
           if-no-files-found: error
           retention-days: 14
 
   linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+    env:
+      # The AppImage tools can't strip newer binaries' sections on some systems; Strata's is stripped by Cargo already.
+      NO_STRIP: "true"
     steps:
       - uses: actions/checkout@v7
 
@@ -85,20 +124,29 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: scanner
+          workspaces: |
+            scanner
+            src/app
 
-      # musl-tools for the scanner, ntfs-3g and zstd for fresh NTFS test images, rpm and bsdtar for the packages.
+      # WebKitGTK and GTK for the app (built on 22.04 so it runs on 22.04 and newer), musl-tools for the scanner,
+      # ntfs-3g and zstd for fresh NTFS test images and the pacman package, xvfb for the smoke test.
       - name: Install tools
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends musl-tools ntfs-3g zstd rpm libarchive-tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev \
+            build-essential curl wget file musl-tools ntfs-3g zstd rpm libarchive-tools xvfb
 
       - name: Install dependencies
         run: npm ci
 
       - name: Check renderer syntax
-        run: for f in $(find src scripts -name '*.js'); do node --check "$f"; done
+        run: for f in $(find src scripts -name '*.js' -not -path '*/vendor/*'); do node --check "$f"; done
 
-      - name: Check import map and CSP hash
+      - name: Check import map, vendored libraries and changelog
         run: npm run check
+
+      - name: Test the release scripts
+        run: npm run test:scripts
 
       - name: Scanner format, lints and unit tests
         working-directory: scanner
@@ -119,16 +167,34 @@ jobs:
       - name: Test the scanner end to end
         run: npm run test:scanner
 
-      - name: Build AppImage, deb, rpm, pacman and tar.gz
-        run: npm run dist:linux
+      - name: App format, lints and unit tests
+        working-directory: src/app
+        run: |
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+
+      # An RPM version can't contain "-", so pre-releases (0.3.0-beta.1) are built without the .rpm.
+      - name: Build deb, rpm and AppImage
+        run: |
+          bundles=deb,rpm,appimage
+          case "$(node -p "require('../../package.json').version")" in *-*) bundles=deb,appimage ;; esac
+          npx tauri build --bundles "$bundles" ${{ env.TAURI_RELEASE_CONFIG }}
+        working-directory: src/app
+
+      - name: Smoke test the built app
+        run: xvfb-run -a node scripts/smoke-test.js
+
+      - name: Package everything, with the pacman package and the tarball
+        run: node scripts/package-release.js
 
       - uses: actions/upload-artifact@v7
         with:
           name: strata-linux
           path: |
-            dist/Strata-*.AppImage
-            dist/Strata-*.deb
-            dist/Strata-*.rpm
+            dist/Strata-*.AppImage*
+            dist/Strata-*.deb*
+            dist/Strata-*.rpm*
             dist/Strata-*.pacman
             dist/Strata-*.tar.gz
           if-no-files-found: error
@@ -136,6 +202,7 @@ jobs:
 
   # A short run of each fuzz target on the NTFS file-table reader: damaged data must never crash it.
   fuzz:
+    if: ${{ !inputs.release }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

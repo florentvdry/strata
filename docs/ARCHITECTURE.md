@@ -1,8 +1,8 @@
 # Architecture
 
-Strata has three parts: a small **scanner** process that touches the disk, the Electron **main process** that orchestrates it, and the **UI** that turns a scan into maps and cleanup suggestions.
+Strata has three parts: a small **scanner** process that touches the disk, the **app** (Tauri, in Rust) that orchestrates it, and the **UI** that turns a scan into maps and cleanup suggestions.
 
-The scanner is one Rust program, `strata-scan`, built for Windows and Linux from [`scanner/`](../scanner). What differs between the two systems (listing folders, drives, the NTFS fast scan, Recycle Bin vs. Trash) lives in two small platform modules behind one interface; everything else is shared. The main process and the UI only differ in small platform details: the path separator, case-sensitivity, drive names and wording.
+The scanner is one Rust program, `strata-scan`, built for Windows and Linux from [`scanner/`](../scanner). What differs between the two systems (listing folders, drives, the NTFS fast scan, Recycle Bin vs. Trash) lives in two small platform modules behind one interface; everything else is shared. The app and the UI only differ in small platform details: the path separator, case-sensitivity, drive names and wording.
 
 ```mermaid
 flowchart LR
@@ -17,9 +17,9 @@ flowchart LR
     T --> M
     T --> C
   end
-  P["preload.js<br/>window.strata"]
-  subgraph Main["Main process"]
-    IPC["IPC handlers<br/>scans · files · settings · history"]
+  P["bridge.js<br/>window.strata"]
+  subgraph Main["App (src/app, Rust)"]
+    IPC["Commands<br/>scans · files · settings · history · updates"]
   end
   subgraph Scanner["strata-scan (Rust)"]
     W["Folder walk"]
@@ -77,7 +77,7 @@ flowchart TB
 
 The full contract, with every message, is in [PROTOCOL.md](PROTOCOL.md).
 
-### Talking to the main process
+### Talking to the app
 
 The scanner writes **JSON lines** to stdout and reads plain-text **commands** from stdin.
 
@@ -145,18 +145,39 @@ Saved scans live in the data folder (`scans/`), alongside an `index.json` of rec
 - **Linux** (`platform/linux/trash.rs`): the **freedesktop.org Trash**. The home Trash (`$XDG_DATA_HOME/Trash`, usually `~/.local/share/Trash`) when the item is on the same file system, otherwise `$topdir/.Trash/$uid` (when it's a sticky folder, not a link) or `$topdir/.Trash-$uid` on the item's own drive. A `.trashinfo` file with the original path and the local date is reserved with `O_EXCL` before the move, as the spec asks.
 - **Permanent** deletion is shared (`delete.rs`): recursive, links and junctions removed as links, never followed; read-only attributes cleared on Windows.
 
-## Main process (`src/main/`)
+## App (`src/app/`)
 
-- Creates the window (sandboxed renderer, context isolation, no Node in the UI) and exposes a narrow API through `preload.js`.
-- Starts the scanner for scans, duplicates and deletions, forwards progress to the UI, and mirrors scan progress on the taskbar button.
-- Keeps settings, recent scans and the 7-day history as small JSON files. Writes go to a temporary file first, then get renamed.
-- **Deletion:** targets are expanded (a "contents only" target, such as a temp folder, becomes its children), protected paths are refused (`src/main/platform.js`, plus the drives and Trash folders from the scanner's `info`), and the scanner does the work.
+A [Tauri](https://tauri.app) app: the UI runs in the web view the system already has (WebView2 on Windows, WebKitGTK on Linux) and talks to Rust code through commands. One command per call of `window.strata`, in `commands.rs`.
+
+- **Window and security:** one window, created in `setup` so the portable build can keep the web view's files next to the `.exe`. The Content-Security-Policy is in `tauri.conf.json`; navigation away from the app is refused. The UI has no file system or shell access of its own: only the app's commands, which check what they are asked.
+- **The scanner is inside the app** (`scanner.rs`). `build.rs` embeds `bin/strata-scan(.exe)`; on first run (and after each update) it is unpacked to `<data>/bin/`, so a portable build stays one file. `scanner::run` starts it, reads its JSON lines and forwards them to the UI as events.
+- Starts the scanner for scans, duplicates and deletions, and mirrors scan progress on the taskbar button.
+- Keeps settings, recent scans and the 7-day history as small JSON files (`store.rs`). Writes go to a temporary file first, then get renamed.
+- **Deletion:** targets are expanded (a "contents only" target, such as a temp folder, becomes its children), protected paths are refused (`platform.rs`, plus the drives and Trash folders from the scanner's `info`), and the scanner does the work.
 - **Restore:** asks the scanner which Recycle Bin / Trash items match a history entry (`trash-list`), then has it put them back (`restore`).
 - **Restart as administrator:** relaunches through `Start-Process -Verb RunAs` and passes the pending scan along. Windows only: Linux has no file-table fast scan, and GUI apps shouldn't run as root.
+- **Files dropped on the window** arrive as paths from Tauri (the web view can't see them); `bridge.js` forwards them as `onFileDrop`.
+
+### Updates (`updates.rs`)
+
+Off until the person says yes (Settings › Updates; the first run asks). Then once a day, or on *Check now*, the app reads a small manifest (`latest.json`) from GitHub, and `tauri-plugin-updater` verifies every download against the minisign public key in `tauri.conf.json` before anything is installed.
+
+| Build | How the update is installed |
+|---|---|
+| Windows installer (NSIS) | The plugin runs the new setup and the app restarts |
+| Windows portable `.exe` | `swap_executable`: the new file replaces the running one (the old one is renamed `.old`, because a running `.exe` can be renamed but not overwritten, and removed at the next start), then the app starts again |
+| Linux AppImage | The plugin replaces the AppImage; the app starts it again |
+| Linux `.deb` / `.rpm` | The plugin installs the package through `pkexec` (a password prompt) |
+| `.tar.gz`, pacman, development builds | The app only says a new version exists and opens the download page |
+
+The portable build is told apart from the installed one by the missing `uninstall.exe` next to it. It reads the manifest entry `windows-x86_64-portable`; the others read the entry the bundler stamps into the binary (`windows-x86_64-nsis`, `linux-x86_64-appimage`, `-deb`, `-rpm`). Stable reads `releases/latest/download/latest.json`; Beta reads the one on the fixed `channel-beta` release, which every release refreshes. An update never installs while a scan or a cleanup is running. See [RELEASING.md](RELEASING.md) for how the files and the manifest are made.
 
 ## UI (`src/renderer/`)
 
-Plain ES modules with [Preact](https://preactjs.com/) and [htm](https://github.com/developit/htm), and no build step.
+Plain ES modules with [Preact](https://preactjs.com/) and [htm](https://github.com/developit/htm), and no build step. The two libraries are vendored in `vendor/` (`npm run vendor` refreshes them).
+
+- **`bridge.js`:** defines `window.strata` for the app's commands, before the modules load.
+- **`lib/changelog.js`, `lib/changelog-data.js`, `lib/markdown.js`:** the release notes behind *What's new* and the update dialog. `changelog-data.js` is generated from `CHANGELOG.md`.
 
 - **`lib/store.js`:** one global store, plus a separate tiny store for the hovered item so mouse moves don't re-render the whole screen.
 - **`lib/tree.js`:** loads a `.strata` file into typed arrays and builds:

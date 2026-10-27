@@ -3,7 +3,9 @@ import { store, toast } from './lib/store.js';
 import { parseScan } from './lib/tree.js';
 import { buildSuggestions, userItem, dupeCandidates } from './lib/cleanup.js';
 import { fmtBytes, plural } from './lib/format.js';
-import { isWin, fold, isUnderPath, TRASH } from './lib/platform.js';
+import { isWin, fold, isUnderPath, TRASH, FILE_MANAGER } from './lib/platform.js';
+import CHANGELOG from './lib/changelog-data.js';
+import { between } from './lib/changelog.js';
 
 const api = window.strata;
 const s = () => store.state;
@@ -21,7 +23,8 @@ export async function init() {
   store.set({ info, settings, recent, ready: true });
   await refreshDrives();
   const pending = await api.pendingScan();
-  if (pending) startScan(pending.root, pending.options);
+  if (pending) { startScan(pending.root, pending.options); return; }
+  initUpdates(info.version, settings);
 }
 
 export function applyAccent(c) {
@@ -56,6 +59,79 @@ export function closeModal() { store.set({ modal: null }); }
 export async function relaunchAsAdmin(pending) {
   const ok = await api.relaunchAdmin(pending || null);
   if (!ok) toast('Administrator rights were not granted.');
+}
+
+// ───────────── right-click menu ─────────────
+
+// Where the last right-click happened, so the menu opens under the pointer.
+let pointer = { x: 0, y: 0 };
+window.addEventListener('contextmenu', (e) => { pointer = { x: e.clientX, y: e.clientY }; }, true);
+
+/** Shows a menu; resolves with the chosen item's id, or null when it was dismissed. */
+export function showMenu(items) {
+  closeMenu();
+  return new Promise((resolve) => store.set({ menu: { ...pointer, items, resolve } }));
+}
+
+export function closeMenu(id = null) {
+  const m = s().menu;
+  if (!m) return;
+  store.set({ menu: null });
+  m.resolve(id);
+}
+
+// ───────────── what's new & updates ─────────────
+
+export function openReleaseNotes(all = true) {
+  const entries = all ? CHANGELOG : CHANGELOG.slice(0, 1);
+  openModal({ kind: 'whatsnew', entries, title: all ? 'Release notes' : `What's new in Strata ${s().info.version}` });
+}
+
+// After an update, once: what changed since the version the person last ran.
+function initUpdates(version, settings) {
+  api.onUpdate((u) => store.set({ update: u }));
+  api.updateState().then((u) => store.set({ update: u }));
+  const seen = settings.lastSeenVersion;
+  if (seen !== version) saveSettings({ lastSeenVersion: version });
+  const news = seen ? between(CHANGELOG, seen, version) : [];
+  if (news.length) openModal({ kind: 'whatsnew', entries: news, title: `Strata ${version} is installed` });
+  else if (settings.updates.check === null) openModal({ kind: 'updatesAsk' });
+}
+
+export async function setUpdateOptions(patch) {
+  await saveSettings({ updates: { ...s().settings.updates, ...patch } });
+}
+
+export async function answerUpdatesAsk(check) {
+  await setUpdateOptions({ check });
+  closeModal();
+  if (check) checkForUpdates(false);
+}
+
+/** Looks for an update now. `show` opens the update dialog when there is one. */
+export async function checkForUpdates(show = true) {
+  try {
+    const u = await api.updateCheck();
+    store.set({ update: u });
+    if (show && u.phase === 'available') openModal({ kind: 'update' });
+    else if (show && u.phase === 'uptodate') toast(`Strata ${s().info.version} is up to date.`);
+  } catch (e) { toast(e.message); }
+}
+
+export async function downloadUpdate() {
+  try { store.set({ update: await api.updateDownload() }); } catch (e) { toast(e.message); }
+}
+
+export async function installUpdate() {
+  try { await api.updateInstall(); } catch (e) { toast(e.message, 6000); }
+}
+
+export function skipUpdate() {
+  const u = s().update;
+  if (!u || !u.version) return;
+  setUpdateOptions({ skipped: u.version });
+  store.set({ update: { ...u, phase: 'uptodate', version: null, notes: null } });
+  closeModal();
 }
 
 // ───────────── scanning ─────────────
@@ -321,7 +397,16 @@ export async function copyPath(path) {
 export async function nodeMenu(i) {
   const { tree, ex } = s();
   const it = itemForNode(i);
-  const action = await api.nodeMenu({ isDir: tree.isDir(i), canZoom: tree.isDir(i) && i !== ex.zoom, inCleanup: !!(it && s().cleanup.on[it.id]), isRoot: i === 0 });
+  const isDir = tree.isDir(i);
+  const inCleanup = !!(it && s().cleanup.on[it.id]);
+  const action = await showMenu([
+    isDir ? { id: 'zoom', label: 'Zoom in', enabled: i !== ex.zoom } : { id: 'open', label: 'Open' },
+    { id: 'show', label: isWin ? 'Show in Explorer' : `Show in ${FILE_MANAGER}` },
+    { id: 'copy', label: 'Copy path' },
+    { separator: true },
+    { id: 'cleanup', label: inCleanup ? 'Remove from cleanup' : 'Add to cleanup', enabled: i !== 0 },
+    { id: 'trash', label: `Move to ${TRASH}`, enabled: i !== 0 },
+  ]);
   const p = tree.path(i);
   if (action === 'zoom') zoomTo(i);
   else if (action === 'open') api.open(p);

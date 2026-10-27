@@ -99,3 +99,14 @@ button:disabled { opacity: .45; cursor: default !important; }
   position: absolute; pointer-events: none; z-index: 3; background: rgba(14, 16, 20, .92); border: 1px solid #333944;
   border-radius: 8px; padding: 6px 9px; font-size: 12px; color: #E6E8EB; white-space: nowrap; max-width: 420px; overflow: hidden; text-overflow: ellipsis;
 }
+
+/* Right-click menu */
+.menu-shield { position: fixed; inset: 0; z-index: 70; }
+.menu {
+  position: fixed; min-width: 200px; padding: 5px; box-sizing: border-box; display: flex; flex-direction: column;
+  background: #1A1E24; border: 1px solid #333944; border-radius: 10px; box-shadow: 0 14px 40px rgba(0, 0, 0, .55);
+  animation: strata-fade .08s ease-out;
+}
+.menu-item { text-align: left; height: 32px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: #E6E8EB; cursor: pointer; font-size: 13px; }
+.menu-item:hover:not(:disabled), .menu-item:focus-visible { background: #262B33; outline: none; }
+.menu-sep { height: 1px; margin: 5px 6px; background: #2A2F37; }

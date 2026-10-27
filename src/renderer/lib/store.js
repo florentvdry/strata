@@ -20,8 +20,8 @@ function createStore(initial) {
 export const store = createStore({
   ready: false,
   screen: 'start',
-  info: { admin: false, version: '0.1.0', home: '', temp: '' },
-  settings: { accent: '#C6F432', shading: true, scan: { mft: true, hidden: true, links: false }, view: 'treemap' },
+  info: { admin: false, version: '0.0.0', home: '', temp: '' },
+  settings: { accent: '#C6F432', shading: true, scan: { mft: true, hidden: true, links: false }, view: 'treemap', updates: { check: null, channel: 'stable', lastCheck: 0, skipped: '' }, lastSeenVersion: '' },
   drives: null, // null until the first listing arrives
   recent: [],
   scan: null,
@@ -32,6 +32,8 @@ export const store = createStore({
   dupes: { status: 'idle', pct: 0, groups: [] },
   cleanup: { items: [], on: {}, user: [], cat: 'all', permanent: false },
   modal: null,
+  menu: null, // the right-click menu: { x, y, items, resolve }
+  update: null, // what the updater is doing (see src/app/updates.rs)
   toast: null,
   dragging: false,
 });
@@ -40,7 +42,11 @@ export const hover = createStore({ id: -1 });
 
 export function useStore(s = store) {
   const [, force] = useState(0);
-  useEffect(() => s.subscribe(() => force((x) => x + 1)), [s]);
+  useEffect(() => {
+    const off = s.subscribe(() => force((x) => x + 1));
+    force((x) => x + 1); // the state may have changed between the first render and this subscription
+    return off;
+  }, [s]);
   return s.state;
 }
 

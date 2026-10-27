@@ -1,22 +1,18 @@
 // Regenerates docs/screenshots/*.png from a made-up drive, so no real files end up in the docs.
-// Usage: npm run screenshots   (needs Node 22+ for the built-in WebSocket)
+// Usage: npm run screenshots   (needs Playwright with Chromium: npm i --no-save playwright && npx playwright install chromium)
+// The UI runs in Chromium with a stand-in for the app's bridge (window.strata) that serves the made-up drive.
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { spawn, execFileSync } from 'child_process';
+import http from 'http';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
 import { buildDemo, encodeScan } from './demo-data.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const OUT = path.join(ROOT, 'docs', 'screenshots');
-const PORT = 9347;
 const GB = 1024 ** 3, TB = 1024 ** 4;
-const electron = createRequire(import.meta.url)('electron');
-
-execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'build-scanner.js'), '--if-missing'], { stdio: 'inherit' });
 fs.mkdirSync(OUT, { recursive: true });
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'strata-shots-'));
 
 // ── demo data ──
 const now = Date.UTC(2026, 9, 27, 0, 12) / 1000;
@@ -65,49 +61,55 @@ const scan = {
 };
 const dupes = [{ size: nodes.find((n) => n.name === 'backup_2026-08.zip').size, verified: true, paths: ['C:\\Users\\alex\\Documents\\Backups\\backup_2026-08.zip', 'C:\\Users\\alex\\Downloads\\backup_2026-08.zip'] }];
 
-// ── drive the app ──
-const app = spawn(electron, [ROOT, `--remote-debugging-port=${PORT}`], { env: { ...process.env, STRATA_DATA_DIR: path.join(tmp, 'data') }, stdio: 'ignore' });
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+// ── serve the UI and open it with a stand-in bridge ──
+const { chromium } = createRequire(import.meta.url)('playwright');
+const UI = path.join(ROOT, 'src', 'renderer');
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.json': 'application/json' };
+const server = http.createServer((req, res) => {
+  const file = path.join(UI, decodeURIComponent(new URL(req.url, 'http://x').pathname).replace(/^\/$/, '/index.html'));
+  if (!file.startsWith(UI) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404).end(); return; }
+  res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' }).end(fs.readFileSync(file));
+});
+await new Promise((r) => server.listen(0, '127.0.0.1', r));
 
-async function connect() {
-  for (let i = 0; i < 80; i++) {
-    try {
-      const list = await (await fetch(`http://127.0.0.1:${PORT}/json`)).json();
-      const page = list.find((t) => t.type === 'page');
-      if (page) return page.webSocketDebuggerUrl;
-    } catch { /* starting */ }
-    await wait(250);
-  }
-  throw new Error('Strata did not start');
-}
-const ws = new WebSocket(await connect());
-await new Promise((r) => ws.addEventListener('open', r, { once: true }));
-let id = 0;
-const pending = new Map();
-ws.addEventListener('message', (ev) => { const m = JSON.parse(ev.data); if (pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); } });
-const send = (method, params = {}) => new Promise((r) => { pending.set(++id, r); ws.send(JSON.stringify({ id, method, params })); });
-const evaluate = async (expression) => {
-  const r = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
-  if (r.result.exceptionDetails) throw new Error(r.result.exceptionDetails.exception?.description || 'eval failed');
-  return r.result.result.value;
-};
+const bridge = `(() => {
+  const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  const none = () => () => {};
+  const settings = { accent: '#C6F432', shading: true, scan: { mft: true, hidden: true, links: false }, view: 'treemap', updates: { check: false, channel: 'stable', lastCheck: 0, skipped: '' }, lastSeenVersion: '0.2.0' };
+  window.strata = {
+    platform: 'win32',
+    appInfo: async () => ({ admin: false, version: '0.2.0', user: 'alex', home: 'C:\\\\Users\\\\alex', temp: 'C:\\\\Temp', platform: 'win32', portable: false }),
+    drives: async () => ${JSON.stringify(drives)}, settings: async () => settings, saveSettings: async (p) => Object.assign(settings, p),
+    recent: async () => ${JSON.stringify(recent)}, pendingScan: async () => null, loadScan: async () => b64('${buf.toString('base64')}'),
+    findDupes: async () => [], stat: async () => ({ isDir: true, size: 0 }), exists: async () => true, history: async () => [],
+    onScan: none, onDupes: none, onDeleteProgress: none, onUpdate: none, onFileDrop: none,
+    updateState: async () => ({ phase: 'idle', mode: 'installer', configured: true, current: '0.2.0' }),
+  };
+})();`;
+
+fs.writeFileSync("/tmp/bridge-out.js", bridge);
+const browser = await chromium.launch();
+const page = await (await browser.newContext({ deviceScaleFactor: 2, viewport: { width: 1440, height: 900 } })).newPage();
+await page.addInitScript(bridge);
+page.on('pageerror', (e) => console.error('page error:', e.message));
+page.on('requestfailed', (r) => console.error('failed:', r.url()));
+page.on('response', (r) => { if (r.status() >= 400) console.error(r.status(), r.url()); });
+page.on('console', (m) => { if (m.type() === 'error') console.error('console:', m.text()); });
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const evaluate = (expression) => page.evaluate(expression);
 const inPage = (body) => evaluate(`(async () => { const A = await import('./actions.js'); const { store } = await import('./lib/store.js'); ${body} })()`);
-const viewport = (width, height) => send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 2, mobile: false });
+const viewport = (width, height) => page.setViewportSize({ width, height });
 async function shot(name) {
   await wait(700);
-  const r = await send('Page.captureScreenshot', { format: 'png' });
-  fs.writeFileSync(path.join(OUT, `${name}.png`), Buffer.from(r.result.data, 'base64'));
+  await page.screenshot({ path: path.join(OUT, `${name}.png`) });
   console.log(`docs/screenshots/${name}.png`);
 }
 
 try {
-  await send('Page.enable');
-  await viewport(1440, 900);
-  for (let i = 0; i < 80 && !(await evaluate(`document.body.innerText.includes('What should we map')`)); i++) await wait(250);
+  await page.goto(`http://127.0.0.1:${server.address().port}/`);
+  await page.waitForFunction(() => document.body.innerText.includes('What should we map'), null, { timeout: 20000 }).catch(async (e) => { console.error(await page.evaluate(() => document.body.innerText.slice(0, 300))); throw e; });
   await inPage(`for (let i = 0; i < 40 && !store.state.drives; i++) await new Promise((r) => setTimeout(r, 250));`);
-  await inPage(`store.set({ drives: ${JSON.stringify(drives)}, recent: ${JSON.stringify(recent)}, info: { ...store.state.info, admin: false, home: 'C:\\\\Users\\\\alex' } });`);
   await shot('start');
-
   await inPage(`store.set({ scan: ${JSON.stringify(scan)}, screen: 'scanning' });`);
   await shot('scanning');
 
@@ -139,8 +141,6 @@ try {
   await viewport(1440, 900);
   await shot('cleanup');
 } finally {
-  ws.close();
-  app.kill();
-  await wait(500);
-  fs.rmSync(tmp, { recursive: true, force: true });
+  await browser.close();
+  server.close();
 }
