@@ -1,0 +1,35 @@
+# Changelog
+
+All notable changes to Strata are documented here.
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/).
+
+## [Unreleased]
+
+## [0.1.0] - 2026-10-27
+
+First public release.
+
+### Added
+
+- **Start screen:** every ready drive with bus and media type, file system, used/free space and a low-space warning. Folder picker, drag-and-drop anywhere, remembered scan options, and the last 8 scans saved for instant reopening.
+- **Scanner:**
+  - Multi-threaded folder walk with long-path support.
+  - **Fast scan** that reads the NTFS master file table directly (administrator rights), with an offer to restart elevated and resume.
+  - Optional hidden/system files, and junction and symlink following with loop protection.
+- **Scanning screen:** live percentage, time estimate, counters, a map of top-level folders that fills in, and the biggest files so far. Pause, resume and cancel. *Explore partial results* while the scan continues, refreshed in place when it finishes. Progress also shows on the taskbar button.
+- **Explorer:**
+  - Treemap (cushion-shaded), sunburst and columns views with hover, select, zoom and a right-click menu.
+  - Breadcrumb, folder tree in sync with the map, file-type legend that can highlight a type, and a details panel with a mini-map for folders.
+  - Keyboard shortcuts.
+- **Search** with name terms, globs, size filters and `type:`.
+- **Smart views:** largest files, content-verified duplicates, untouched for 1 year, caches & temp, dev artifacts.
+- **Cleanup review:**
+  - Categorised suggestions with reasons and Safe/Review badges, select-all, a live "you'll free" total and the drive after cleanup.
+  - Recycle Bin by default, or permanent deletion.
+  - Protected system locations, cache folders emptied rather than removed, and files in use reported.
+- **History:** 7-day log of removals, with restore from the Recycle Bin.
+- **Settings:** accent color, cushion shading, restart as administrator, clear recent scans.
+- Windows installer (per-user) and a single-file portable version that keeps its data next to the `.exe`.
+
+[Unreleased]: https://github.com/florentvdry/strata/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/florentvdry/strata/releases/tag/v0.1.0

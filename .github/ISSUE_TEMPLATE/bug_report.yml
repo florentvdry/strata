@@ -1,0 +1,63 @@
+name: Bug report
+description: Something doesn't work as expected.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. Please check the [existing issues](https://github.com/florentvdry/strata/issues) first.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you see, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Scan C:\ with fast scan off
+        2. Open Explorer › Columns
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Strata version
+      description: Shown in the footer and in Settings.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: build
+    attributes:
+      label: Which build?
+      options:
+        - Installer
+        - Portable
+        - From source (npm start)
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: "Windows 11 24H2"
+    validations:
+      required: true
+  - type: dropdown
+    id: scan
+    attributes:
+      label: Scan type
+      options:
+        - Normal scan
+        - Fast scan (MFT, as administrator)
+        - Not scan related
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or logs
+      description: Drag images here. Logs from DevTools (F12 › Console) help a lot.
