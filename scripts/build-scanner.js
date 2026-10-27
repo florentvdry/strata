@@ -49,11 +49,12 @@ if (!target && process.platform === 'linux') {
   else console.warn(`Note: ${musl} isn't installed (rustup target add ${musl}); building for this machine's libc only.`);
 }
 
-const args = ['build', '--locked', '--manifest-path', path.join(crate, 'Cargo.toml')];
+// Relative manifest path + cwd: with shell: true on Windows an absolute path containing a space is split in two.
+const args = ['build', '--locked', '--manifest-path', 'Cargo.toml'];
 if (!debug) args.push('--release');
 if (target) args.push('--target', target);
 try {
-  execFileSync('cargo', args, { stdio: 'inherit', shell: process.platform === 'win32' });
+  execFileSync('cargo', args, { stdio: 'inherit', shell: process.platform === 'win32', cwd: crate });
 } catch {
   process.exit(1);
 }

@@ -217,13 +217,13 @@ export function buildSuggestions(tree, env, dupes) {
   // ── files: installers, disk images, media ──
   const media = [];
   let largest = -1;
-  const t = now();
+  const nowS = now();
   for (let i = 1; i < n; i++) {
     if (removed[i] || (flags[i] & F_DIR) || covered[parent[i]] || sys[parent[i]]) continue;
     const s = size[i];
     if (s > (largest < 0 ? 0 : size[largest])) largest = i;
     const nm = names[i];
-    const age = t - tree.mtime[i];
+    const age = nowS - tree.mtime[i];
     if (IMAGE_EXT.test(nm) && s >= 100 * 1024 ** 2 && !appdata[parent[i]]) {
       single('installer', i, nm, t('Disk image downloaded {when}', { when: fmtAgo(tree.mtime[i]) }), 'review', { defaultOn: true });
     } else if (INSTALLER_EXT.test(nm) && downloads[parent[i]] && s >= 5 * 1024 ** 2 && age > 14 * DAY) {
@@ -235,7 +235,7 @@ export function buildSuggestions(tree, env, dupes) {
   }
   media.sort((a, b) => size[b] - size[a]);
   for (const i of media.slice(0, 25)) {
-    const age = t - tree.mtime[i];
+    const age = nowS - tree.mtime[i];
     if (i === largest) single('media', i, names[i], t('Largest file on the drive'), 'review');
     else if (age > 90 * DAY) single('media', i, names[i], t('Not modified since {month}', { month: fmtMonth(tree.mtime[i]) }), 'review');
     else if (size[i] >= 2 * 1024 ** 3) single('media', i, names[i], t('{size} GB in a single file', { size: (size[i] / 1024 ** 3).toFixed(1) }), 'review');

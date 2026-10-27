@@ -214,7 +214,7 @@ async function onScanDone(msg) {
   try { bytes = await api.loadScan(msg.id); } catch (e) { setScan({ error: e.message }); return; }
   if (!s().scan || s().scan.id !== msg.id) return; // cancelled while finishing
   const viewing = s().partial && (s().screen === 'explorer' || s().screen === 'cleanup');
-  loadTree(bytes, msg.id, { keep: viewing });
+  try { loadTree(bytes, msg.id, { keep: viewing }); } catch (e) { setScan({ error: e.message }); return; }
   store.set({ scan: null, screen: viewing ? s().screen : 'explorer' });
   if (viewing) toast(t('Scan finished — the map now shows everything.'));
   refreshDrives();
