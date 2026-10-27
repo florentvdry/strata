@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.2.0-beta.1] - 2026-10-27
+
 ### Changed
 
 - **Strata now runs on Tauri instead of Electron.** It uses the web view already on your system (WebView2 on Windows, WebKitGTK on Linux), so the downloads are a few megabytes instead of a bundled browser (the Linux AppImage, which carries its own web view, is about 80 MB), and it starts faster and uses less memory. The look and every feature are the same.
@@ -76,5 +78,6 @@ First public release.
 - **Settings:** accent color, cushion shading, restart as administrator, clear recent scans.
 - Windows installer (per-user) and a single-file portable version that keeps its data next to the `.exe`.
 
-[Unreleased]: https://github.com/florentvdry/strata/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/florentvdry/strata/compare/v0.2.0-beta.1...HEAD
+[0.2.0-beta.1]: https://github.com/florentvdry/strata/compare/v0.1.0...v0.2.0-beta.1
 [0.1.0]: https://github.com/florentvdry/strata/releases/tag/v0.1.0

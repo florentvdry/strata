@@ -106,6 +106,9 @@ test('a release bumps the version everywhere and leaves a changelog that passes 
     fs.mkdirSync(path.dirname(path.join(tmp, f)), { recursive: true });
     fs.copyFileSync(path.join(root, f), path.join(tmp, f));
   }
+  // Right after a real release there is nothing under Unreleased, so the copy gets an entry of its own.
+  const log = path.join(tmp, 'CHANGELOG.md');
+  fs.writeFileSync(log, fs.readFileSync(log, 'utf8').replace('## [Unreleased]\n', '## [Unreleased]\n\n### Added\n\n- A test entry.\n'));
   const run = (...args) => spawnSync(process.execPath, [path.join(tmp, 'scripts', 'changelog.js'), ...args], { cwd: tmp, encoding: 'utf8' });
   const r = run('release', '9.9.9', '--date=2030-01-02');
   assert.strictEqual(r.status, 0, r.stderr);
