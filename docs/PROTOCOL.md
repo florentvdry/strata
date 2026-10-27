@@ -1,8 +1,8 @@
 # Scanner protocol
 
-The contract between the Electron main process and the scanner (`strata-scan`, built from [`scanner/`](../scanner)). The UI never talks to the scanner directly.
+The contract between the app (`src-tauri/`) and the scanner (`strata-scan`, built from [`scanner/`](../scanner)). The UI never talks to the scanner directly.
 
-- The main process starts one scanner process per job: `strata-scan <command> [arguments]`.
+- The app starts one scanner process per job: `strata-scan <command> [arguments]`.
 - The scanner writes **one JSON object per line** on stdout. Every message has a `type`.
 - During a scan it reads **plain-text commands** on stdin, one per line.
 - List files (for `dupes`, `delete`, `restore`) are UTF-8 text, one entry per line.

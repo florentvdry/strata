@@ -130,3 +130,23 @@ footer{border-top:1px solid var(--line);padding-block:28px 40px;color:var(--dim)
 footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center}
 footer nav{display:flex;flex-wrap:wrap;gap:12px 20px;margin-left:auto}
 footer a{color:var(--muted)}
+
+/* changelog */
+.changelog{padding-block:64px 80px;max-width:820px}
+.changelog .head{display:flex;flex-direction:column;gap:14px;margin-bottom:40px}
+.changelog h1{font-size:clamp(34px,5vw,52px);font-weight:800;letter-spacing:-.04em}
+.changelog .head p{color:var(--muted);max-width:60ch}
+.changelog .beta{display:inline-flex;gap:8px;align-items:center;color:var(--muted);font-size:14px;cursor:pointer}
+.changelog .beta input{accent-color:var(--lime)}
+.rel{padding-block:28px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:14px}
+.rel header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.rel h2{font-size:26px;letter-spacing:-.03em}
+.rel h2 a{color:var(--fg)}
+.rel time{font-family:var(--mono);font-size:13px;color:var(--dim)}
+.rel .tag{font-size:12px;padding:1px 8px;border:1px solid #333944;border-radius:6px;color:var(--amber)}
+.rel .dl{margin-left:auto;font-size:14px}
+.rel .summary{color:var(--fg);font-size:17px}
+.rel h3{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
+.rel ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;color:#C9CED6}
+.rel ul ul{margin-top:6px;gap:4px;color:var(--muted)}
+.rel code{padding:1px 5px;border-radius:5px;background:var(--panel);border:1px solid var(--line)}

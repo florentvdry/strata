@@ -41,7 +41,7 @@ Grab the latest version from the [**Releases page**](https://github.com/florentv
 | **Installer** | `Strata-Setup-<version>.exe` | Installs for your user account (no admin needed), adds Start menu and desktop shortcuts, uninstalls from *Settings › Apps*. |
 | **Portable** | `Strata-<version>-Portable.exe` | A single file. Nothing is installed: settings and saved scans live in a `Strata Data` folder next to the `.exe`. |
 
-Requires Windows 10 or 11 (x64). Each release lists SHA-256 checksums for verification.
+Requires Windows 10 or 11 (x64) and the WebView2 runtime, which is part of Windows 11 and of up-to-date Windows 10 (the installer adds it if it's missing; for the portable build, [install it from Microsoft](https://developer.microsoft.com/microsoft-edge/webview2/) if Strata doesn't start). Each release has a `SHA256SUMS.txt` for verification.
 
 > [!NOTE]
 > The builds aren't code-signed yet, so Windows SmartScreen may say *"Windows protected your PC"*. Click **More info › Run anyway**.
@@ -60,8 +60,18 @@ Strata runs on the common x64 distributions. Pick the package for yours:
 
 The packages add Strata to your application menu; from a terminal, run `strata`.
 
-> [!TIP]
-> On Ubuntu 24.04 and later, an AppImage or the `.tar.gz` build may quit at launch with a sandbox error, because AppArmor restricts the user namespaces Chromium uses. Install the `.deb` instead (it sets the sandbox up), or start the app with `--no-sandbox`. The AppImage also needs FUSE: `sudo apt install libfuse2t64` (or `libfuse2`), `sudo dnf install fuse-libs`.
+Needs WebKitGTK 4.1 and GTK 3 (Ubuntu 22.04+, Debian 12+, current Fedora and Arch); the packages pull them in. The AppImage also needs FUSE: `sudo apt install libfuse2t64` (or `libfuse2`), `sudo dnf install fuse-libs`.
+
+### Updates
+
+Strata only looks for updates when you let it: it asks the first time, and you can change it in **Settings › Updates** (stable or beta channel, *Check now*). It reads one small file from github.com; nothing about you or your files is sent, and every update is verified with a signature before it's installed.
+
+| Build | Updates |
+|---|---|
+| Windows installer, Windows portable `.exe`, Linux AppImage, `.deb`, `.rpm` | Inside Strata: *Update to x.y.z*, then *Install and restart*. The portable `.exe` replaces itself in place; the `.deb` and `.rpm` ask for your password. |
+| `.pacman`, `.tar.gz` | Strata tells you when there's a new version and opens the download page. |
+
+Release notes are in the app (**Settings › Updates › What's new**), on each GitHub release, and on the [website's changelog](https://florentvdry.github.io/strata/changelog).
 
 ## Features
 
@@ -159,10 +169,10 @@ Strata deletes files, so it's careful about it:
 
 ## Building from source
 
-Prerequisites: Windows 10/11 or Linux, [Node.js](https://nodejs.org) 20 or newer (22+ for `npm run screenshots`), Git, and [Rust](https://rustup.rs) for the scanner:
+Prerequisites: Windows 10/11 or Linux, [Node.js](https://nodejs.org) 20 or newer (22+ for `npm run screenshots`), Git, and [Rust](https://rustup.rs) for the scanner and the app:
 
-- **Windows:** `rustup` with the default `x86_64-pc-windows-msvc` toolchain, which needs the [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) ("Desktop development with C++"). The rustup installer offers to set them up.
-- **Linux:** `rustup`, plus `rustup target add x86_64-unknown-linux-musl` and your distribution's `musl-tools` (or `musl-gcc`) for the static binary that runs everywhere. Without them, the scanner is built for your own system only.
+- **Windows:** `rustup` with the default `x86_64-pc-windows-msvc` toolchain, which needs the [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) ("Desktop development with C++"). The rustup installer offers to set them up. The WebView2 runtime is part of Windows 11 and of up-to-date Windows 10.
+- **Linux:** `rustup`, plus `rustup target add x86_64-unknown-linux-musl` and your distribution's `musl-tools` (or `musl-gcc`) for the scanner's static binary. The app itself needs WebKitGTK 4.1 and GTK 3 with their development files, for example on Debian/Ubuntu: `sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev build-essential`. See [Tauri's prerequisites](https://v2.tauri.app/start/prerequisites/) for other distributions.
 
 ```bash
 git clone https://github.com/florentvdry/strata.git
@@ -173,20 +183,20 @@ npm start
 
 | Script | Does |
 |---|---|
-| `npm start` | Builds the scanner if needed and runs the app |
+| `npm start` | Builds the scanner if needed and runs the app (`tauri dev`) |
 | `npm run build:scanner` | Builds the scanner (`scanner/`, Rust) → `bin/strata-scan(.exe)` |
-| `npm run dist` | Builds the installer and portable `.exe` into `dist/` |
-| `npm run pack` | Builds an unpacked app into `dist/win-unpacked/` (quick to test) |
-| `npm run dist:linux` | Builds the AppImage, `.deb`, `.rpm`, `.pacman` and `.tar.gz` into `dist/` (the `.rpm` needs `rpmbuild`, the `.pacman` needs `bsdtar`) |
-| `npm run pack:linux` | Builds an unpacked Linux app into `dist/linux-unpacked/` |
+| `npm run build` | Builds the app and, on Windows, the installer (the app needs the scanner built first; this does it) |
+| `npm run build:linux` | Builds the `.deb`, `.rpm` and AppImage |
+| `npm run package` | After a build: names the files for a release in `dist/` (portable `.exe`, `.pacman`, `.tar.gz`, signatures) |
+| `npm run check` | Checks the UI's import map and vendored libraries, and `CHANGELOG.md` |
 | `npm run test:rust` | The scanner's unit tests, including the NTFS fast scan on disk images |
+| `npm run test:app` | The app's Rust tests: settings, protected locations, the portable file swap |
+| `npm run test:scripts` | The release tooling's tests (changelog, update manifest) |
 | `npm run test:scanner` | Runs the built scanner against a temporary folder tree: scan, pause, snapshot, duplicates, Recycle Bin / Trash, restore |
 | `npm run check:fast-scan` | Windows, as administrator: checks that the NTFS fast scan finds the same tree as a folder walk |
-| `npm run screenshots` | Regenerates `docs/screenshots/` from a made-up drive |
+| `npm run screenshots` | Regenerates `docs/screenshots/` from a made-up drive (needs Playwright with Chromium) |
+| `npm run release -- <version>` | Moves the changelog's Unreleased notes under a version and bumps every version number; see [docs/RELEASING.md](docs/RELEASING.md) |
 | `npm run build:icon` | Redraws `assets/icon.png` and `assets/icon.ico` |
-
-> [!TIP]
-> If `npm start` reports that Electron isn't installed, your npm may be blocking install scripts. Run `node node_modules/electron/install.js` once.
 
 ## Project structure
 
@@ -197,12 +207,12 @@ strata/
 │  ├─ src/platform/          What differs between Windows and Linux
 │  ├─ tests/fixtures/        NTFS disk images for the fast-scan tests
 │  └─ fuzz/                  Fuzz targets for the NTFS reader
-├─ src/main/                 Electron main process: window, scanner processes, files, settings, history
+├─ src-tauri/                The app (Tauri, Rust): window, scanner processes, files, settings, history, updates
 ├─ src/renderer/             UI, Preact + htm with no build step
 │  ├─ views/                 Start, Scanning, Explorer, Cleanup
 │  ├─ components/            Space map (treemap, sunburst, columns), dialogs, icons
 │  └─ lib/                   Scan file parser and tree model, search, cleanup rules, formatting
-├─ scripts/                  Scanner build and tests, icon, screenshots
+├─ scripts/                  Scanner build and tests, changelog and release tooling, icon, screenshots
 ├─ assets/                   App icon
 └─ docs/                     Architecture notes and screenshots
 ```
@@ -226,7 +236,7 @@ Bug reports, ideas and pull requests are welcome. Please read [CONTRIBUTING.md](
 ## Acknowledgements
 
 - Inspired by [WinDirStat](https://windirstat.net/) and its cushion treemaps.
-- Built with [Electron](https://www.electronjs.org/), [Preact](https://preactjs.com/) and [htm](https://github.com/developit/htm).
+- Built with [Tauri](https://tauri.app/), [Preact](https://preactjs.com/) and [htm](https://github.com/developit/htm).
 - Typeset in [Geist and Geist Mono](https://vercel.com/font) by Vercel, under the [SIL Open Font License](src/renderer/fonts/OFL.txt).
 
 ## License

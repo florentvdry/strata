@@ -4,6 +4,8 @@ import { html } from '../lib/html.js';
 import { store, useStore, toast } from '../lib/store.js';
 import { fmtBytes, fmtWhen, plural, middleEllipsis } from '../lib/format.js';
 import { isWin, TRASH } from '../lib/platform.js';
+import { Notes } from '../lib/markdown.js';
+import { parseNotes } from '../lib/changelog.js';
 import * as A from '../actions.js';
 
 const api = window.strata;
@@ -147,6 +149,7 @@ function SettingsDialog() {
         ${!info.admin && html`<button class="btn" onClick=${() => A.relaunchAsAdmin(null)}>Restart as admin</button>`}
       </div>
     </section>`}
+    <${UpdatesSection} />
     <section style="display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid #22262D">
       <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #8C94A0">Data</span>
       <div style="display: flex; align-items: center; gap: 12px">
@@ -202,13 +205,158 @@ function HistoryDialog() {
   <//>`;
 }
 
-const DIALOGS = { admin: AdminDialog, trash: TrashDialog, confirmCleanup: ConfirmCleanupDialog, busy: BusyDialog, result: ResultDialog, settings: SettingsDialog, history: HistoryDialog };
+const LABEL = 'font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #8C94A0';
+const HINT = 'font-size: 12px; color: #9BA3AF';
+
+function updateStatus(u, version) {
+  if (!u) return '';
+  if (!u.configured) return 'Updates aren\'t set up in this build.';
+  switch (u.phase) {
+    case 'checking': return 'Checking…';
+    case 'uptodate': return `Strata ${version} is up to date.`;
+    case 'available': return `Strata ${u.version} is available.`;
+    case 'downloading': return `Downloading Strata ${u.version}…`;
+    case 'ready': return `Strata ${u.version} is ready to install.`;
+    case 'installing': return 'Installing…';
+    case 'error': return u.error || 'Couldn\'t check for updates.';
+    default: return '';
+  }
+}
+
+function UpdatesSection() {
+  const { settings, info, update: u } = useStore();
+  const opts = settings.updates;
+  const busy = u && ['checking', 'downloading', 'installing'].includes(u.phase);
+  const pending = u && ['available', 'downloading', 'ready'].includes(u.phase);
+  return html`<section style="display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid #22262D">
+    <span style=${LABEL}>Updates</span>
+    <label style="display: flex; align-items: center; gap: 12px; cursor: pointer">
+      <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span>Check for updates automatically</span><span style=${HINT}>Once a day, Strata asks github.com for the newest version. Nothing about you or your files is sent.</span></span>
+      <input type="checkbox" checked=${opts.check === true} onChange=${(e) => A.setUpdateOptions({ check: e.currentTarget.checked })} style="width: 18px; height: 18px; margin: 0" />
+    </label>
+    <div style="display: flex; align-items: center; gap: 12px">
+      <span style="flex: 1">Update channel</span>
+      <select value=${opts.channel} onChange=${(e) => A.setUpdateOptions({ channel: e.currentTarget.value, skipped: '' })} aria-label="Update channel"
+        style="height: 34px; padding: 0 10px; border-radius: 8px; border: 1px solid #333944; background: #0E1014; color: #E6E8EB; font: inherit">
+        <option value="stable">Stable</option>
+        <option value="beta">Beta (early builds)</option>
+      </select>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px">
+      <span style="flex: 1; display: flex; flex-direction: column; gap: 2px">
+        <span style=${u && u.phase === 'error' ? 'color: #F5B54A' : ''}>${updateStatus(u, info.version) || `Strata ${info.version}`}</span>
+        ${info.portable && html`<span style=${HINT}>Portable build: the update replaces this file in place.</span>`}
+      </span>
+      ${pending ? html`<button class="btn" onClick=${() => A.openModal({ kind: 'update' })}>View</button>` : html`<button class="btn" disabled=${busy || !(u && u.configured)} onClick=${() => A.checkForUpdates(true)}>${busy ? 'Checking…' : 'Check now'}</button>`}
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px">
+      <span style="flex: 1">Release notes</span>
+      <button class="btn" onClick=${() => A.openReleaseNotes(true)}>What's new</button>
+    </div>
+  </section>`;
+}
+
+function UpdatesAskDialog() {
+  return html`<${Dialog} title="Keep Strata up to date?" onClose=${() => A.answerUpdatesAsk(false)}>
+    <p>Strata can look for a newer version once a day and tell you when there is one. It only asks github.com for a small file with the latest version number; nothing about you or your files is sent, and nothing is installed without your say.</p>
+    <p>You can change this any time in Settings › Updates.</p>
+    <div class="actions">
+      <button class="btn quiet" onClick=${() => A.answerUpdatesAsk(false)}>No thanks</button>
+      <button class="btn primary" onClick=${() => A.answerUpdatesAsk(true)}>Check automatically</button>
+    </div>
+  <//>`;
+}
+
+const MODE_HINT = {
+  installer: 'Strata will close, install the update and start again.',
+  portable: 'Strata will replace this file with the new version and start again. Your settings stay in "Strata Data" next to it.',
+  appimage: 'Strata will replace this AppImage with the new version and start again.',
+  package: 'Linux asks for your password to install the package. Strata starts again afterwards.',
+  manual: 'This copy of Strata is updated by hand: download the new version from the release page.',
+};
+
+function UpdateDialog() {
+  const { update: u, info } = useStore();
+  if (!u || !u.version) return html`<${Dialog} title="No update" onClose=${A.closeModal}><p>${updateStatus(u, info.version)}</p><div class="actions"><button class="btn primary" onClick=${A.closeModal}>Done</button></div><//>`;
+  const manual = u.mode === 'manual';
+  const downloading = u.phase === 'downloading';
+  const pct = u.total ? Math.min(1, u.downloaded / u.total) : 0;
+  const entry = parseNotes(u.notes);
+  const hasNotes = entry.summary || entry.sections.length;
+  const page = `https://github.com/florentvdry/strata/releases/tag/v${u.version}`;
+  return html`<${Dialog} title=${u.phase === 'ready' ? 'Ready to install' : `Strata ${u.version} is available`} onClose=${downloading ? null : A.closeModal} wide>
+    <p>You have <b style="color: #E6E8EB">${info.version}</b>. ${MODE_HINT[u.mode] || ''}</p>
+    ${hasNotes && html`<div style="max-height: 40vh; overflow: auto; padding: 14px; border-radius: 10px; border: 1px solid #22262D; background: #0E1014"><${Notes} entry=${entry} /></div>`}
+    ${downloading && html`
+      <span style="display: block; height: 8px; border-radius: 4px; background: #22262D; overflow: hidden"><span style=${`display: block; height: 100%; width: ${Math.max(4, pct * 100)}%; background: var(--accent); transition: width .2s`}></span></span>
+      <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #9BA3AF">${fmtBytes(u.downloaded)}${u.total ? ` of ${fmtBytes(u.total)}` : ''}</span>`}
+    ${u.error && html`<p style="color: #F5B54A">${u.error}</p>`}
+    <div class="actions">
+      ${u.phase === 'available' && html`<button class="btn quiet" onClick=${A.skipUpdate}>Skip this version</button>`}
+      <button class="btn quiet" onClick=${A.closeModal}>${downloading ? 'Hide' : 'Later'}</button>
+      ${manual && html`<button class="btn primary" onClick=${() => api.openUrl(page)}>Open download page</button>`}
+      ${!manual && u.phase === 'available' && html`<button class="btn primary" onClick=${A.downloadUpdate}>Download update</button>`}
+      ${!manual && u.phase === 'ready' && html`<button class="btn primary" onClick=${A.installUpdate}>Install and restart</button>`}
+      ${u.phase === 'installing' && html`<span style="display: inline-flex; align-items: center; gap: 10px; color: #9BA3AF"><span class="spinner"></span> Installing…</span>`}
+    </div>
+  <//>`;
+}
+
+function WhatsNewDialog({ m }) {
+  return html`<${Dialog} title=${m.title} onClose=${A.closeModal} wide>
+    <div style="display: flex; flex-direction: column; gap: 22px; max-height: 58vh; overflow: auto">
+      ${m.entries.map((e) => html`
+        <div key=${e.version} style="display: flex; flex-direction: column; gap: 12px">
+          <div style="display: flex; align-items: baseline; gap: 10px">
+            <span style="font-size: 16px; font-weight: 600">${e.version}</span>
+            ${e.prerelease && html`<span style="font-size: 11px; padding: 1px 7px; border-radius: 6px; border: 1px solid #333944; color: #F5B54A">beta</span>`}
+            <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #7B8390">${e.date}</span>
+          </div>
+          <${Notes} entry=${e} />
+        </div>`)}
+      ${!m.entries.length && html`<p>Nothing new to show.</p>`}
+    </div>
+    <div class="actions"><button class="btn primary" onClick=${A.closeModal}>Done</button></div>
+  <//>`;
+}
+
+export function ContextMenu() {
+  const { menu } = useStore();
+  const [pos, setPos] = useState(null);
+  useLayoutEffect(() => setPos(null), [menu]);
+  useEffect(() => {
+    if (!menu) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); A.closeMenu(); } };
+    const onBlur = () => A.closeMenu();
+    window.addEventListener('keydown', onKey, true);
+    window.addEventListener('blur', onBlur);
+    return () => { window.removeEventListener('keydown', onKey, true); window.removeEventListener('blur', onBlur); };
+  }, [menu]);
+  if (!menu) return null;
+  // Keep the menu inside the window: measure it, then flip or slide it back.
+  const place = (el) => {
+    if (!el || pos) return;
+    const r = el.getBoundingClientRect();
+    setPos({ x: Math.max(6, Math.min(menu.x, window.innerWidth - r.width - 6)), y: Math.max(6, Math.min(menu.y, window.innerHeight - r.height - 6)) });
+  };
+  return html`
+    <div class="menu-shield" onMouseDown=${() => A.closeMenu()} onContextMenu=${(e) => { e.preventDefault(); A.closeMenu(); }}>
+      <div class="menu" role="menu" ref=${place} style=${`left: ${(pos || menu).x}px; top: ${(pos || menu).y}px; ${pos ? '' : 'visibility: hidden'}`} onMouseDown=${(e) => e.stopPropagation()}>
+        ${menu.items.map((it, k) => it.separator
+          ? html`<div class="menu-sep" key=${k}></div>`
+          : html`<button type="button" role="menuitem" key=${it.id} class="menu-item" disabled=${it.enabled === false} onClick=${() => A.closeMenu(it.id)}>${it.label}</button>`)}
+      </div>
+    </div>`;
+}
+
+const DIALOGS = { admin: AdminDialog, trash: TrashDialog, confirmCleanup: ConfirmCleanupDialog, busy: BusyDialog, result: ResultDialog, settings: SettingsDialog, history: HistoryDialog, update: UpdateDialog, updatesAsk: UpdatesAskDialog, whatsnew: WhatsNewDialog };
 
 export function Modals() {
   const { modal, toast: t, dragging } = useStore();
   const D = modal && DIALOGS[modal.kind];
   return html`
     ${D && html`<${D} m=${modal} />`}
+    <${ContextMenu} />
     ${t && html`<div class="toast" role="status">${t}</div>`}
     ${dragging && html`<div class="dropzone">${Icon.folderPlus()}<span>Drop a folder to map it</span></div>`}`;
 }

@@ -1,0 +1,32 @@
+[package]
+name = "strata"
+version = "0.2.0-beta.1"
+description = "See what fills your disk, then clean it up"
+authors = ["Florent Vandroy"]
+license = "MIT"
+edition = "2024"
+publish = false
+default-run = "strata"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-updater = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+
+[dev-dependencies]
+tempfile = "3"
+
+# The scanner is embedded in the app (see build.rs), so every build is a single file.
+[profile.release]
+lto = "fat"
+codegen-units = 1
+opt-level = "s"
+strip = true

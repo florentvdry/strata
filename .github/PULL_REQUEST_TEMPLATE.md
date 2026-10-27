@@ -9,7 +9,7 @@
 ## Checklist
 
 - [ ] The change is focused on one thing
-- [ ] Tested by hand with `npm start` (and `npm run pack` if packaging is affected)
-- [ ] `CHANGELOG.md` updated under **Unreleased** for user-visible changes
+- [ ] Tested by hand with `npm start` (and `npm run build` if packaging is affected)
+- [ ] `CHANGELOG.md` updated under **Unreleased** (user-visible changes in Added / Changed / Fixed, CI and tooling under Internal)
 - [ ] Screenshots regenerated (`npm run screenshots`) if a screen looks different
 - [ ] Anything that deletes files was tested on throwaway data

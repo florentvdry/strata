@@ -3,7 +3,7 @@ name: Website
 on:
   push:
     branches: [main]
-    paths: ['website/**', '.github/workflows/website.yml']
+    paths: ['website/**', 'CHANGELOG.md', 'scripts/changelog.js', 'src/renderer/lib/changelog.js', '.github/workflows/website.yml']
   workflow_dispatch:
 
 permissions:

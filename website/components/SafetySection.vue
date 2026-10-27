@@ -17,7 +17,7 @@
       <div id="source" style="display:flex;flex-direction:column;gap:24px;min-width:0">
         <div class="head">
           <span class="kicker">Build from source</span>
-          <h2>Electron UI, Rust scanner.</h2>
+          <h2>Tauri app, Rust scanner.</h2>
           <p>Needs Node.js 20+, Git and Rust. See the README for platform toolchains.</p>
         </div>
         <pre><span class="p">$</span> git clone {{ repo }}.git
@@ -41,5 +41,5 @@ const checks = [
   '<b>Caches are emptied, not removed.</b> Files in use are skipped and reported.',
   '<b>History</b> keeps 7 days and restores items to where they were.',
 ]
-const stack = ['Rust scanner', 'NTFS MFT reader', 'Electron', 'Preact', 'MIT']
+const stack = ['Rust scanner', 'NTFS MFT reader', 'Tauri', 'Preact', 'MIT']
 </script>

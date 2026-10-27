@@ -55,7 +55,8 @@ function Option({ checked, onChange, title, hint, last }) {
 }
 
 export function Start() {
-  const { drives, settings, recent, info } = useStore();
+  const { drives, settings, recent, info, update } = useStore();
+  const pendingUpdate = update && ['available', 'downloading', 'ready'].includes(update.phase);
   const accent = settings.accent;
   const opts = settings.scan;
   const primary = drives && (drives.find((d) => d.system) || drives[0]);
@@ -72,6 +73,9 @@ export function Start() {
       <${Logo} accent=${accent} />
       <span style="font-weight: 700; font-size: 17px; letter-spacing: -0.02em">Strata</span>
       <div style="flex: 1"></div>
+      ${pendingUpdate && html`<button type="button" class="hov-ghost" onClick=${() => A.openModal({ kind: 'update' })} title="A new version is available"
+        style=${`height: 34px; padding: 0 12px; display: flex; align-items: center; gap: 8px; border-radius: 17px; border: 1px solid ${accent}; background: transparent; color: ${accent}; cursor: pointer; font-weight: 500`}>
+        <span style=${`width: 7px; height: 7px; border-radius: 50%; background: ${accent}`}></span>${update.phase === 'ready' ? 'Update ready' : `Update to ${update.version}`}</button>`}
       <button type="button" class="hov-ghost" aria-label="Settings" title="Settings" onClick=${() => A.openModal({ kind: 'settings' })} style="width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid #333944; background: transparent; color: #E6E8EB; cursor: pointer">${Icon.gear()}</button>
     </header>
 

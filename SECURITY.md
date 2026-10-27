@@ -8,7 +8,8 @@ Only the latest release receives fixes.
 
 | Version | Supported |
 |---|---|
-| 0.1.x | ✅ |
+| 0.2.x | ✅ |
+| 0.1.x | ❌ |
 | older | ❌ |
 
 ## Reporting a vulnerability
@@ -27,7 +28,8 @@ Examples of things worth reporting:
 
 - Strata deleting, or offering to delete, files outside what the user selected, or protected system locations.
 - Deletion following a junction or symlink into another location.
-- Ways for a crafted file name, path or scan file to run code or escape the renderer sandbox.
+- Ways for a crafted file name, path or scan file to run code, or for the UI to reach the file system or network other than through the app's commands.
+- Anything that makes the updater install a file that wasn't signed with Strata's update key, or that sends information about the user.
 - Problems with the "restart as administrator" flow.
 
 General bugs and wrong cleanup suggestions that don't put data at risk are better reported as regular [issues](https://github.com/florentvdry/strata/issues).

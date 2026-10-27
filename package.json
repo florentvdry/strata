@@ -11,7 +11,7 @@
     "cleanup",
     "ntfs",
     "mft",
-    "electron",
+    "tauri",
     "windows",
     "linux"
   ],
@@ -25,132 +25,32 @@
   },
   "license": "MIT",
   "author": "Florent Vandroy",
-  "main": "src/main/main.js",
-  "desktopName": "strata.desktop",
   "private": true,
   "scripts": {
-    "postinstall": "node node_modules/electron/install.js",
-    "start": "node scripts/build-scanner.js --if-missing && electron .",
-    "check": "node scripts/check-renderer.js",
+    "start": "node scripts/build-scanner.js --if-missing && tauri dev",
+    "tauri": "tauri",
+    "check": "node scripts/check-renderer.js && node scripts/changelog.js check",
     "build:scanner": "node scripts/build-scanner.js",
     "test:scanner": "node scripts/test-scanner.js",
     "test:rust": "cargo test --locked --manifest-path scanner/Cargo.toml",
+    "test:app": "cargo test --locked --manifest-path src-tauri/Cargo.toml",
+    "test:scripts": "node --test \"scripts/test/*.test.js\"",
     "check:fast-scan": "node scripts/check-fast-scan.js",
+    "signing:setup": "node scripts/setup-signing.js",
+    "package": "node scripts/package-release.js",
     "build:icon": "node scripts/make-icon.js",
-    "pack": "node scripts/build-scanner.js && electron-builder --win --dir",
-    "dist": "node scripts/build-scanner.js && electron-builder --win --publish never",
-    "pack:linux": "node scripts/build-scanner.js && electron-builder --linux --dir",
-    "dist:linux": "node scripts/build-scanner.js && electron-builder --linux --publish never",
+    "vendor": "node scripts/check-renderer.js --vendor",
+    "changelog": "node scripts/changelog.js",
+    "release": "node scripts/changelog.js release",
+    "sync:changelog": "node scripts/changelog.js sync",
+    "build": "node scripts/build-scanner.js && tauri build",
+    "build:linux": "node scripts/build-scanner.js && tauri build --bundles deb,rpm,appimage",
     "screenshots": "node scripts/screenshots/capture.mjs"
   },
-  "dependencies": {
+  "dependencies": {},
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.4",
     "htm": "^3.1.1",
     "preact": "^11.0.2"
-  },
-  "devDependencies": {
-    "electron": "^45.0.0",
-    "electron-builder": "^26.18.0"
-  },
-  "build": {
-    "appId": "io.github.florentvdry.strata",
-    "productName": "Strata",
-    "copyright": "Copyright © 2026 Florent Vandroy",
-    "directories": {
-      "output": "dist",
-      "buildResources": "assets"
-    },
-    "files": [
-      "src/**/*",
-      "assets/icon.png",
-      "package.json"
-    ],
-    "asar": true,
-    "win": {
-      "icon": "assets/icon.ico",
-      "extraResources": [
-        {
-          "from": "bin/strata-scan.exe",
-          "to": "strata-scan.exe"
-        }
-      ],
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
-        }
-      ]
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "Strata",
-      "license": "LICENSE",
-      "installerIcon": "assets/icon.ico",
-      "uninstallerIcon": "assets/icon.ico",
-      "uninstallDisplayName": "Strata",
-      "artifactName": "Strata-Setup-${version}.exe"
-    },
-    "portable": {
-      "artifactName": "Strata-${version}-Portable.exe"
-    },
-    "linux": {
-      "icon": "assets/icon.png",
-      "executableName": "strata",
-      "syncDesktopName": true,
-      "category": "Utility",
-      "synopsis": "See what fills your disk, then clean it up",
-      "maintainer": "Florent Vandroy",
-      "vendor": "Florent Vandroy",
-      "artifactName": "Strata-${version}-${arch}.${ext}",
-      "extraResources": [
-        {
-          "from": "bin/strata-scan",
-          "to": "strata-scan"
-        }
-      ],
-      "target": [
-        {
-          "target": "AppImage",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "deb",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "rpm",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "pacman",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "tar.gz",
-          "arch": [
-            "x64"
-          ]
-        }
-      ]
-    }
   }
 }

@@ -3,8 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "node ../scripts/changelog.js site",
     "dev": "nuxt dev",
+    "prebuild": "node ../scripts/changelog.js site",
     "build": "nuxt build",
+    "pregenerate": "node ../scripts/changelog.js site",
     "generate": "nuxt generate",
     "preview": "nuxt preview"
   },
