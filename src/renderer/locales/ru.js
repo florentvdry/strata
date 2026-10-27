@@ -400,5 +400,6 @@ export default {
   "{size} free · low": "Свободно {size} · мало",
   "{size} left": "Осталось {size}",
   "{size} used": "Занято {size}",
-  "{when} · partial": "{when} · частично"
+  "{when} · partial": "{when} · частично",
+  "Choose a folder to map": "Выберите папку для анализа",
 };

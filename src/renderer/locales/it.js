@@ -400,5 +400,6 @@ export default {
   "{size} free · low": "{size} liberi · poco spazio",
   "{size} left": "{size} rimasti",
   "{size} used": "{size} usati",
-  "{when} · partial": "{when} · parziale"
+  "{when} · partial": "{when} · parziale",
+  "Choose a folder to map": "Scegli una cartella da mappare",
 };

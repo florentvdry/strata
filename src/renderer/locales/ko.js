@@ -401,4 +401,5 @@ export default {
   "{size} left": "{size} 남음",
   "{size} used": "{size} 사용됨",
   "{when} · partial": "{when} · 부분",
+  "Choose a folder to map": "맵으로 볼 폴더 선택",
 };

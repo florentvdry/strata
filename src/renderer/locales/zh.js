@@ -401,4 +401,5 @@ export default {
   "{size} left": "剩余 {size}",
   "{size} used": "已用 {size}",
   "{when} · partial": "{when} · 部分",
+  "Choose a folder to map": "选择要分析的文件夹",
 };

@@ -401,4 +401,5 @@ export default {
   "{size} left": "残り {size}",
   "{size} used": "使用済み {size}",
   "{when} · partial": "{when} · 部分的",
+  "Choose a folder to map": "マップするフォルダーを選択",
 };

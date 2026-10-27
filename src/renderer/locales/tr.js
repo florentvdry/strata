@@ -400,5 +400,6 @@ export default {
   "{size} free · low": "{size} boş · az",
   "{size} left": "{size} kaldı",
   "{size} used": "{size} kullanıldı",
-  "{when} · partial": "{when} · kısmi"
+  "{when} · partial": "{when} · kısmi",
+  "Choose a folder to map": "Haritalanacak bir klasör seçin",
 };

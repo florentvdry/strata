@@ -401,4 +401,5 @@ export default {
   "{size} left": "{size} restants",
   "{size} used": "{size} utilisés",
   "{when} · partial": "{when} · partiel",
+  "Choose a folder to map": "Choisir un dossier à analyser",
 };

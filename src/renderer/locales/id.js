@@ -400,5 +400,6 @@ export default {
   "{size} free · low": "{size} kosong · rendah",
   "{size} left": "{size} tersisa",
   "{size} used": "{size} terpakai",
-  "{when} · partial": "{when} · sebagian"
+  "{when} · partial": "{when} · sebagian",
+  "Choose a folder to map": "Pilih folder untuk dipetakan",
 };

@@ -64,7 +64,7 @@ export function Start() {
   const fastHint = opts.links ? t('Not used while following links') : info.admin ? t('Running as administrator · 10–20× faster on NTFS') : t('Needs admin rights · 10–20× faster on NTFS');
 
   async function pick() {
-    const p = await api.pickFolder();
+    const p = await api.pickFolder(t('Choose a folder to map'));
     if (p) A.requestScan(p);
   }
 

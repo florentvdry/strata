@@ -45,7 +45,7 @@
     open: (path) => call('shell_open')({ path }),
     openUrl: (url) => call('shell_open_url')({ url }),
     copy: (text) => call('clipboard_write')({ text }),
-    pickFolder: call('dialog_folder'),
+    pickFolder: (title) => call('dialog_folder')({ title }),
 
     history: call('history_list'),
     restore: (id) => call('history_restore')({ id }),

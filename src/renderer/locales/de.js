@@ -401,4 +401,5 @@ export default {
   "{size} left": "{size} übrig",
   "{size} used": "{size} belegt",
   "{when} · partial": "{when} · teilweise",
+  "Choose a folder to map": "Ordner zum Kartieren auswählen",
 };

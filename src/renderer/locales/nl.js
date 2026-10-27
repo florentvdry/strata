@@ -400,5 +400,6 @@ export default {
   "{size} free · low": "{size} vrij · weinig",
   "{size} left": "{size} over",
   "{size} used": "{size} gebruikt",
-  "{when} · partial": "{when} · gedeeltelijk"
+  "{when} · partial": "{when} · gedeeltelijk",
+  "Choose a folder to map": "Kies een map om in kaart te brengen",
 };
