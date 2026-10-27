@@ -9,6 +9,7 @@ const listen = (ch) => (fn) => {
 };
 
 contextBridge.exposeInMainWorld('strata', {
+  platform: process.platform,
   appInfo: invoke('app:info'),
   relaunchAdmin: invoke('app:relaunchAdmin'),
   pendingScan: invoke('app:pendingScan'),

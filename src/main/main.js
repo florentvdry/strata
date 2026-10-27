@@ -8,9 +8,15 @@ const readline = require('readline');
 const { spawn, execFile } = require('child_process');
 
 const ROOT = path.join(__dirname, '..', '..');
-const SCANNER = app.isPackaged
-  ? path.join(process.resourcesPath, 'StrataScan.exe')
-  : path.join(ROOT, 'bin', 'StrataScan.exe');
+const IS_WIN = process.platform === 'win32';
+// Windows: StrataScan.exe (C#). Linux: scanner/linux/strata-scan.js, run by Electron's own Node.js.
+const SCANNER_DIR = app.isPackaged ? path.join(process.resourcesPath, 'scanner') : path.join(ROOT, 'scanner', 'linux');
+const SCANNER = IS_WIN
+  ? (app.isPackaged ? path.join(process.resourcesPath, 'StrataScan.exe') : path.join(ROOT, 'bin', 'StrataScan.exe'))
+  : path.join(SCANNER_DIR, 'strata-scan.js');
+const trash = IS_WIN ? null : require(path.join(SCANNER_DIR, 'trash.js'));
+// Paths are case-insensitive on Windows only.
+const fold = IS_WIN ? (s) => s.toLowerCase() : (s) => s;
 
 // The portable build keeps its data next to the .exe; STRATA_DATA_DIR overrides both (used for screenshots).
 const PORTABLE_DIR = process.env.PORTABLE_EXECUTABLE_DIR;
@@ -91,7 +97,9 @@ function send(channel, payload) {
 
 function runHelper(args, onLine, onSpawn) {
   return new Promise((resolve, reject) => {
-    const proc = spawn(SCANNER, args, { windowsHide: true });
+    const proc = IS_WIN
+      ? spawn(SCANNER, args, { windowsHide: true })
+      : spawn(process.execPath, [SCANNER, ...args], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', NODE_OPTIONS: '' } });
     if (onSpawn) onSpawn(proc);
     const rl = readline.createInterface({ input: proc.stdout });
     let err = '';
@@ -110,7 +118,7 @@ async function getInfo(force) {
   if (driveCache && !force && Date.now() - driveCache.at < 8000) return driveCache.value;
   let value = { admin: false, drives: [] };
   await runHelper(['info'], (msg) => { if (msg.type === 'info') value = msg; });
-  value.drives.sort((a, b) => a.letter.localeCompare(b.letter));
+  value.drives.sort((a, b) => (IS_WIN ? a.letter.localeCompare(b.letter) : a.root.localeCompare(b.root)));
   driveCache = { at: Date.now(), value };
   return value;
 }
@@ -126,8 +134,8 @@ function recentList() {
 
 function addRecent(entry) {
   let list = readJson(RECENT, []);
-  const same = list.filter((r) => r.root.toLowerCase() === entry.root.toLowerCase());
-  list = list.filter((r) => r.root.toLowerCase() !== entry.root.toLowerCase());
+  const same = list.filter((r) => fold(r.root) === fold(entry.root));
+  list = list.filter((r) => fold(r.root) !== fold(entry.root));
   for (const r of same) removeScanFiles(r.file);
   list.unshift(entry);
   for (const r of list.slice(MAX_RECENT)) removeScanFiles(r.file);
@@ -258,14 +266,22 @@ ipcMain.handle('dupes:find', async (e, { id, groups }) => {
 
 function protectedPaths() {
   const env = process.env;
+  if (!IS_WIN) {
+    const home = os.homedir();
+    const list = ['/home', '/root', '/usr', '/etc', '/bin', '/sbin', '/lib', '/lib32', '/lib64', '/libx32', '/boot', '/var', '/var/lib', '/opt',
+      '/srv', '/media', '/mnt', '/run', '/tmp', '/var/tmp', '/proc', '/sys', '/dev', '/snap', home, path.join(home, '.config'),
+      path.join(home, '.local'), path.join(home, '.local', 'share'), path.join(home, '.cache'), trash.homeTrash()];
+    for (const d of (driveCache && driveCache.value.drives) || []) list.push(d.root); // mount points
+    return list.map((p) => path.resolve(p));
+  }
   const list = [env.WINDIR, env.SystemRoot && path.join(env.SystemRoot, 'System32'), env.ProgramFiles, env['ProgramFiles(x86)'], env.ProgramData,
     env.USERPROFILE, env.APPDATA, env.LOCALAPPDATA, path.join(env.SystemDrive || 'C:', 'Users'), path.join(env.LOCALAPPDATA || '', 'Temp')];
   return list.filter(Boolean).map((p) => path.resolve(p).toLowerCase());
 }
 
 function isProtected(p) {
-  const r = path.resolve(p).toLowerCase();
-  if (/^[a-z]:\\?$/.test(r)) return true; // drive roots
+  const r = fold(path.resolve(p));
+  if (IS_WIN ? /^[a-z]:\\?$/.test(r) : r === '/') return true; // drive roots
   return protectedPaths().includes(r);
 }
 
@@ -341,11 +357,11 @@ ipcMain.handle('menu:node', (e, spec) => new Promise((resolve) => {
   const item = (id, label, extra = {}) => ({ label, click: () => { chosen = id; }, ...extra });
   const template = [
     ...(spec.isDir ? [item('zoom', 'Zoom in', { enabled: !!spec.canZoom })] : [item('open', 'Open')]),
-    item('show', 'Show in Explorer'),
+    item('show', IS_WIN ? 'Show in Explorer' : 'Show in file manager'),
     item('copy', 'Copy path'),
     { type: 'separator' },
     item('cleanup', spec.inCleanup ? 'Remove from cleanup' : 'Add to cleanup', { enabled: !spec.isRoot }),
-    item('trash', 'Move to Recycle Bin', { enabled: !spec.isRoot }),
+    item('trash', IS_WIN ? 'Move to Recycle Bin' : 'Move to Trash', { enabled: !spec.isRoot }),
   ];
   Menu.buildFromTemplate(template).popup({ window: win, callback: () => resolve(chosen) });
 }));
@@ -384,11 +400,11 @@ async function recycleEntries(drive) {
 }
 
 async function inBin(h) {
-  const drive = h.path.slice(0, 2);
-  const entries = await recycleEntries(drive);
-  const want = h.path.toLowerCase();
+  // Linux: the freedesktop.org Trash (.trashinfo files say where each item came from).
+  const entries = IS_WIN ? await recycleEntries(h.path.slice(0, 2)) : trash.trashEntries(h.path);
+  const want = fold(h.path);
   return entries.filter((en) => {
-    const o = en.original.toLowerCase();
+    const o = fold(en.original);
     return h.contentsOnly ? path.dirname(o) === want : o === want;
   }).filter((en) => Math.abs(en.deletedAt - h.at) < 10 * 60 * 1000);
 }
@@ -431,7 +447,7 @@ ipcMain.handle('history:clear', () => writeJson(HISTORY, []));
 ipcMain.handle('app:info', async () => {
   let admin = false;
   try { admin = (await getInfo()).admin; } catch { /* scanner missing */ }
-  return { admin, version: app.getVersion(), user: os.userInfo().username, home: os.homedir(), temp: os.tmpdir() };
+  return { admin, version: app.getVersion(), user: os.userInfo().username, home: os.homedir(), temp: os.tmpdir(), platform: process.platform };
 });
 ipcMain.handle('drives:list', async (e, force) => (await getInfo(force)).drives);
 ipcMain.handle('settings:get', () => getSettings());
@@ -443,6 +459,7 @@ ipcMain.handle('settings:set', (e, patch) => {
 
 // Relaunch elevated (for the MFT fast scan). The current instance quits once UAC is accepted.
 ipcMain.handle('app:relaunchAdmin', async (e, pending) => {
+  if (!IS_WIN) return false; // no file-table fast scan on Linux, and GUI apps shouldn't run as root
   const quote = (s) => `'${String(s).replace(/'/g, "''")}'`;
   const args = process.argv.slice(1).filter((a) => !a.startsWith('--strata-'));
   if (pending) args.push(`--strata-scan=${Buffer.from(JSON.stringify(pending)).toString('base64')}`);

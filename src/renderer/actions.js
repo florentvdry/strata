@@ -3,6 +3,7 @@ import { store, toast } from './lib/store.js';
 import { parseScan } from './lib/tree.js';
 import { buildSuggestions, userItem, dupeCandidates } from './lib/cleanup.js';
 import { fmtBytes, plural } from './lib/format.js';
+import { isWin, fold, isUnderPath, TRASH } from './lib/platform.js';
 
 const api = window.strata;
 const s = () => store.state;
@@ -60,7 +61,12 @@ export async function relaunchAsAdmin(pending) {
 // ───────────── scanning ─────────────
 
 export function driveOf(path) {
-  return (s().drives || []).find((d) => path.toUpperCase().startsWith(d.root.toUpperCase()));
+  const drives = s().drives || [];
+  if (isWin) return drives.find((d) => path.toUpperCase().startsWith(d.root.toUpperCase()));
+  // Linux mount points nest ("/" holds everything): the deepest one containing the path.
+  let best = null;
+  for (const d of drives) if (isUnderPath(path, d.root) && (!best || d.root.length > best.root.length)) best = d;
+  return best || undefined;
 }
 
 // Starts a scan, first asking about admin rights when fast scan needs them.
@@ -68,8 +74,8 @@ export function requestScan(root, mode) {
   const { settings, info } = s();
   const options = { ...settings.scan };
   const d = driveOf(root);
-  const ntfs = d && d.fs === 'NTFS';
-  if (mode === 'normal') options.mft = false;
+  const ntfs = isWin && d && d.fs === 'NTFS';
+  if (mode === 'normal' || !isWin) options.mft = false; // the file-table fast scan is Windows only
   else if (options.mft && !options.links && ntfs && !info.admin) {
     openModal({ kind: 'admin', root, options });
     return;
@@ -196,7 +202,7 @@ function biggestFile(tree, from) {
 export function loadTree(bytes, id, { partial = false, keep = false } = {}) {
   const tree = parseScan(bytes);
   const prevTree = s().tree, prev = s().ex;
-  const sameRoot = prevTree && prevTree.names[0].toLowerCase() === tree.names[0].toLowerCase();
+  const sameRoot = prevTree && fold(prevTree.names[0]) === fold(tree.names[0]);
   let ex = {
     zoom: 0, sel: -1, open: new Set([0]), more: {}, panel: 'folders', query: '', typeFilter: -1,
   };
@@ -390,7 +396,7 @@ export async function runCleanup() {
 
 async function runDeletion(targets, permanent) {
   const total = targets.reduce((a, t) => a + (t.size || 0), 0);
-  openModal({ kind: 'busy', title: permanent ? 'Deleting…' : 'Moving to Recycle Bin…', done: 0, total: 1, current: '' });
+  openModal({ kind: 'busy', title: permanent ? 'Deleting…' : `Moving to ${TRASH}…`, done: 0, total: 1, current: '' });
   let results;
   try {
     results = await api.remove({ targets, permanent });
@@ -423,7 +429,7 @@ async function runDeletion(targets, permanent) {
   rebuildCleanup();
   refreshDrives();
   const ok = results.filter((r) => r.ok).length;
-  const where = permanent ? 'deleted permanently' : 'moved to the Recycle Bin';
+  const where = permanent ? 'deleted permanently' : `moved to the ${TRASH}`;
   const lines = [`${plural(ok, 'item')} ${where}.`];
   if (failures.length) lines.push(`${plural(failures.length, 'item')} couldn't be fully removed — usually because a program is using them.`);
   openModal({ kind: 'result', title: `Freed ${fmtBytes(freed)}`, lines, failures, freed, total });

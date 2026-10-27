@@ -2,6 +2,7 @@
 import { F_DIR, F_REPARSE } from './tree.js';
 import { T } from './types.js';
 import { fmtShort, fmtAgo, fmtMonth, plural } from './format.js';
+import { isWin, sep, fold, parentPath } from './platform.js';
 
 export const CATS = [
   { id: 'all', label: 'Everything', hint: 'All suggestions, safest first', dot: 'var(--accent)' },
@@ -17,14 +18,32 @@ const DAY = 86400;
 const now = () => Date.now() / 1000;
 
 // Folders we never suggest anything inside (other than the specific rules below).
-const SYSTEM_SEGMENTS = new Set(['windows', 'program files', 'program files (x86)', 'programdata', '$recycle.bin', 'system volume information', 'windowsapps', 'recovery', '$windows.~bt', '$windows.~ws']);
+// On Linux these are the top-level system folders of the root file system.
+const SYSTEM_SEGMENTS = isWin
+  ? new Set(['windows', 'program files', 'program files (x86)', 'programdata', '$recycle.bin', 'system volume information', 'windowsapps', 'recovery', '$windows.~bt', '$windows.~ws'])
+  : new Set(['usr', 'bin', 'sbin', 'lib', 'lib32', 'lib64', 'libx32', 'etc', 'boot', 'efi', 'proc', 'sys', 'dev', 'run', 'snap', 'var', 'opt', 'srv', 'lost+found']);
 
-const BROWSERS = ['\\google\\chrome\\user data\\', '\\microsoft\\edge\\user data\\', '\\bravesoftware\\brave-browser\\user data\\', '\\mozilla\\firefox\\profiles\\', '\\opera software\\', '\\vivaldi\\user data\\', '\\chromium\\user data\\'];
+const BROWSERS = (isWin
+  ? ['\\google\\chrome\\user data\\', '\\microsoft\\edge\\user data\\', '\\bravesoftware\\brave-browser\\user data\\', '\\mozilla\\firefox\\profiles\\', '\\opera software\\', '\\vivaldi\\user data\\', '\\chromium\\user data\\']
+  : ['/google-chrome/', '/chromium/', '/microsoft-edge/', '/bravesoftware/brave-browser/', '/vivaldi/', '/opera/', '/.mozilla/firefox/', '/.cache/mozilla/firefox/']);
 const BROWSER_CACHE = new Set(['cache', 'code cache', 'gpucache', 'cache2', 'grshadercache', 'shadercache', 'dawncache', 'dawngraphitecache', 'dawnwebgpucache', 'startupcache']);
 const GENERIC_CACHE = new Set(['cache', 'caches', 'gpucache', 'code cache', 'cachestorage', 'shadercache', 'cache_data', 'blob_storage', 'crashpad']);
 const FRAMEWORK_CACHE = new Set(['.next', '.nuxt', '.parcel-cache', '.turbo', '.svelte-kit', '.angular']);
-const INSTALLER_EXT = /\.(exe|msi|msix|msixbundle|appx|appxbundle)$/i;
+const INSTALLER_EXT = /\.(exe|msi|msix|msixbundle|appx|appxbundle|deb|rpm|appimage|flatpakref)$/i;
 const IMAGE_EXT = /\.(iso|img|dmg)$/i;
+// Linux app data lives in dot-folders of the home folder (XDG base directories, Flatpak's ~/.var).
+const LINUX_APPDATA = new Set(['.config', '.local', '.cache', '.var', '.mozilla']);
+// Children of ~/.cache handled by a more specific rule (browsers, packages).
+const LINUX_CACHE_SKIP = /^(google-chrome|chromium|microsoft-edge|bravesoftware|vivaldi|opera|mozilla|thumbnails|pip|yarn|go-build|ms-playwright|pnpm)$/;
+// Package manager downloads, by distribution family. They need admin rights to remove.
+const PKG_CACHES = [
+  ['/var/cache/apt/archives', 'APT package cache', 'Downloaded .deb packages · or run sudo apt clean'],
+  ['/var/cache/dnf', 'DNF package cache', 'Downloaded packages and metadata · or run sudo dnf clean all'],
+  ['/var/cache/yum', 'YUM package cache', 'Downloaded packages and metadata · or run sudo yum clean all'],
+  ['/var/cache/pacman/pkg', 'Pacman package cache', 'Every downloaded package version · or run sudo paccache -r'],
+  ['/var/cache/zypp/packages', 'Zypper package cache', 'Downloaded packages · or run sudo zypper clean'],
+];
+const DOWNLOADS = new Set(['downloads', 'téléchargements', 'descargas', 'scaricati', 'transferências']);
 
 export function buildSuggestions(tree, env, dupes) {
   const { n, names, parent, flags, size, removed } = tree;
@@ -36,13 +55,17 @@ export function buildSuggestions(tree, env, dupes) {
   const appdata = new Uint8Array(n); // inside AppData
   const downloads = new Uint8Array(n);
   const dotted = new Uint8Array(n);  // inside a dot-folder such as .vscode
-  const rootPath = names[0].replace(/\\$/, '');
-  const rootSeg = rootPath.split('\\').map((s) => s.toLowerCase());
-  const rootIsSystem = rootSeg.some((s) => SYSTEM_SEGMENTS.has(s));
-  const rootInAppData = rootSeg.includes('appdata');
+  const rootPath = names[0].endsWith(sep) ? names[0].slice(0, -1) : names[0];
+  const rootSeg = rootPath.split(sep).map((s) => s.toLowerCase());
+  // Linux: only the first segment says "system" (/usr/…), a project's bin/ or lib/ folder doesn't.
+  const rootIsSystem = isWin ? rootSeg.some((s) => SYSTEM_SEGMENTS.has(s)) : SYSTEM_SEGMENTS.has(rootSeg[1]);
+  const rootInAppData = isWin ? rootSeg.includes('appdata') : rootSeg.some((s) => LINUX_APPDATA.has(s));
   sys[0] = rootIsSystem ? 1 : 0;
   appdata[0] = rootInAppData ? 1 : 0;
-  downloads[0] = rootSeg.includes('downloads') ? 1 : 0;
+  downloads[0] = rootSeg.some((s) => DOWNLOADS.has(s)) ? 1 : 0;
+  // Absolute paths of the folders Linux rules look for.
+  const home = env && env.home ? env.home.replace(/\/+$/, '') : '';
+  const homeCache = home + '/.cache';
 
   const lpath = (i) => tree.path(i).toLowerCase();
   const hasChild = (i, re) => tree.kids(i).some((c) => re.test(names[c]));
@@ -69,9 +92,10 @@ export function buildSuggestions(tree, env, dupes) {
     const p = parent[i];
     covered[i] = covered[p];
     const nm = lower(i);
-    sys[i] = sys[p] || (p === 0 && SYSTEM_SEGMENTS.has(nm)) || nm === 'windowsapps' ? 1 : 0;
-    appdata[i] = appdata[p] || nm === 'appdata' ? 1 : 0;
-    downloads[i] = downloads[p] || nm === 'downloads' ? 1 : 0;
+    // On Linux only a scan of / has /usr, /etc… as its direct children.
+    sys[i] = sys[p] || (p === 0 && SYSTEM_SEGMENTS.has(nm) && (isWin || rootPath === '')) || nm === 'windowsapps' ? 1 : 0;
+    appdata[i] = appdata[p] || nm === 'appdata' || (!isWin && LINUX_APPDATA.has(nm)) ? 1 : 0;
+    downloads[i] = downloads[p] || DOWNLOADS.has(nm) ? 1 : 0;
     dotted[i] = dotted[p] || nm.startsWith('.') ? 1 : 0;
     if (removed[i] || covered[i]) continue;
     if (!(flags[i] & F_DIR) || (flags[i] & F_REPARSE)) continue;
@@ -111,6 +135,30 @@ export function buildSuggestions(tree, env, dupes) {
     if ((nm === 'd3dscache' && pn === 'local') || ((nm === 'dxcache' || nm === 'glcache' || nm === 'dxccache' || nm === 'vkcache' || nm === 'optixcache') && (pn === 'nvidia' || pn === 'amd' || pn === 'nv_cache')) || (nm === 'shadercache' && (pn === 'intel' || pn === 'steamapps')) || (nm === 'shadercache' && pn === 'steam')) {
       group('shader', () => ({ id: 'cache:shader', cat: 'cache', name: 'Shader caches', reason: 'Rebuilt automatically on next launch', risk: 'safe', contentsOnly: true }), i);
       continue;
+    }
+    if (!isWin) {
+      const ap = tree.path(i);
+      if (ap === '/tmp' || ap === '/var/tmp') {
+        single('cache', i, ap === '/tmp' ? 'Temporary files' : 'Long-lived temporary files', ageReason(tree, i, 'touched'), 'review', { contentsOnly: true });
+        continue;
+      }
+      if (ap === '/var/lib/systemd/coredump' || ap === '/var/crash') {
+        group('crash', () => ({ id: 'cache:crash', cat: 'cache', name: 'Crash dumps & error reports', reason: 'Only useful for debugging crashes', risk: 'safe', contentsOnly: true }), i);
+        continue;
+      }
+      const pkg = PKG_CACHES.find((c) => c[0] === ap);
+      if (pkg) {
+        single('cache', i, pkg[1], pkg[2], 'review', { contentsOnly: true });
+        continue;
+      }
+      if (ap === homeCache + '/thumbnails') {
+        single('cache', i, 'Thumbnail cache', 'Previews your file manager rebuilds as needed', 'safe', { contentsOnly: true });
+        continue;
+      }
+      if (parentPath(ap) === homeCache && !LINUX_CACHE_SKIP.test(nm) && size[i] >= 64 * 1024 ** 2) {
+        genericCaches.push(i); // ~/.cache/<app>: by definition safe to lose, but apps may be slow to rebuild it
+        continue;
+      }
     }
 
     // ── dev artifacts ──
@@ -217,16 +265,16 @@ export function userItem(tree, i) {
   const isDir = tree.isDir(i);
   const p = tree.path(i);
   return {
-    id: `user:${p}`, cat: 'user', name: tree.name(i), path: p.slice(0, p.lastIndexOf('\\')) || p, nodes: [i],
+    id: `user:${p}`, cat: 'user', name: tree.name(i), path: parentPath(p), nodes: [i],
     targets: [{ path: p, contentsOnly: false }], v: tree.size[i], risk: 'review', defaultOn: true,
     reason: isDir ? `Folder · ${plural(tree.files[i], 'file')}` : `Last modified ${fmtAgo(tree.mtime[i])}`,
   };
 }
 
 function packageCache(nm, pn, gp) {
-  if (nm === 'npm-cache') return 'npm cache';
-  if (nm === 'cache' && pn === 'pip') return 'pip cache';
-  if (nm === 'cache' && pn === 'yarn') return 'Yarn cache';
+  if (nm === 'npm-cache' || (nm === '_cacache' && pn === '.npm')) return 'npm cache';
+  if ((nm === 'cache' && pn === 'pip') || (nm === 'pip' && pn === '.cache')) return 'pip cache';
+  if ((nm === 'cache' && pn === 'yarn') || (nm === 'yarn' && pn === '.cache')) return 'Yarn cache';
   if (nm === 'packages' && pn === '.nuget') return 'NuGet packages';
   if (nm === 'v3-cache' && pn === 'nuget') return 'NuGet HTTP cache';
   if (nm === 'go-build') return 'Go build cache';
@@ -240,7 +288,7 @@ function packageCache(nm, pn, gp) {
 
 function appName(tree, i) {
   const anc = tree.ancestors(i).map((a) => tree.name(a));
-  const k = anc.findIndex((s) => /^(local|roaming|locallow)$/i.test(s));
+  const k = anc.findIndex((s) => (isWin ? /^(local|roaming|locallow)$/i : /^(\.cache|\.config)$/).test(s));
   let name = k >= 0 && anc[k + 1] ? anc[k + 1] : tree.name(tree.parent[i]);
   if (/^(packages|programs)$/i.test(name) && anc[k + 2]) name = anc[k + 2].replace(/_[a-z0-9]{10,}$/i, '').split('.').pop();
   return name;
@@ -248,15 +296,15 @@ function appName(tree, i) {
 
 function commonPath(paths) {
   if (!paths.length) return '';
-  let parts = paths[0].split('\\');
+  let parts = paths[0].split(sep);
   for (const p of paths.slice(1)) {
-    const q = p.split('\\');
+    const q = p.split(sep);
     let k = 0;
-    while (k < parts.length && k < q.length && parts[k].toLowerCase() === q[k].toLowerCase()) k++;
+    while (k < parts.length && k < q.length && fold(parts[k]) === fold(q[k])) k++;
     parts = parts.slice(0, k);
   }
-  const s = parts.join('\\');
-  return s.length > 3 ? s : '';
+  const s = parts.join(sep);
+  return s.length > (isWin ? 3 : 1) ? s : '';
 }
 
 // "41k files, none opened in 30 days"
@@ -293,10 +341,12 @@ export function selectionStats(tree, items, on) {
 }
 
 // Personal folders, where an extra copy of a file is almost always just clutter.
-const USER_FOLDERS = /\\(desktop|documents|downloads|pictures|videos|music|onedrive[^\\]*)\\/i;
+const USER_FOLDERS = /[\\/](desktop|documents|downloads|pictures|videos|music|onedrive[^\\/]*|bureau|téléchargements|vidéos|musique)[\\/]/i;
 
 export function isUserContent(path, env) {
   if (USER_FOLDERS.test(path)) return true;
+  // Linux: other drives are mounted under /media, /mnt or /run/media.
+  if (!isWin) return /^\/(media|mnt|run\/media)\//.test(path);
   const sysDrive = env && env.home ? env.home.slice(0, 2).toLowerCase() : 'c:';
   return path.slice(0, 2).toLowerCase() !== sysDrive;
 }
@@ -309,7 +359,7 @@ export function dupeCandidates(tree, minSize = 1024 * 1024) {
   const skip = new Uint8Array(n);
   const SKIP = new Set([...SYSTEM_SEGMENTS, 'appdata', 'node_modules', 'steamapps', 'steamlibrary', 'epic games', 'site-packages', '$recycle.bin', 'mods']);
   const bad = (s) => SKIP.has(s) || s.startsWith('.') || s.includes('cache');
-  skip[0] = names[0].toLowerCase().split('\\').slice(1).some(bad) ? 1 : 0;
+  skip[0] = names[0].toLowerCase().split(sep).slice(1).some(bad) ? 1 : 0;
   const bySize = new Map();
   for (let i = 1; i < n; i++) {
     const p = parent[i];

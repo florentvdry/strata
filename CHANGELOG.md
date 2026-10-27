@@ -11,6 +11,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- **Linux support** for the common x64 distributions, packaged as AppImage, `.deb` (Ubuntu, Debian, Mint…), `.rpm` (Fedora, RHEL, openSUSE…), `.pacman` (Arch, Manjaro…) and `.tar.gz`, all built in CI.
+  - A Linux scanner (`scanner/linux/`) with the same protocol and scan file as the Windows one, run by Electron's own Node.js: mounted drives with bus, SSD/HDD and labels, a multi-threaded walk that stays on one file system, counts hard links once and sparse files by what they use.
+  - Deleting goes to the freedesktop.org Trash, which History can restore from.
+  - Linux cleanup rules: `~/.cache`, thumbnails, `/tmp` and `/var/tmp`, core dumps, APT/DNF/YUM/Pacman/Zypper package caches, Linux browser profiles and `.deb`/`.rpm`/AppImage installers in Downloads.
+  - Linux paths, drive names and wording (Trash, file manager) throughout the UI; the Windows-only fast scan and admin restart are hidden.
+- `npm run test:scanner`, run in CI, checks the Linux scanner against a temporary folder tree.
 - `npm run check`, run in CI, verifies that every file in the UI's import map exists and that the Content-Security-Policy hash matches it. A mismatch would otherwise leave the window blank without any build error.
 
 ## [0.1.0] - 2026-10-27

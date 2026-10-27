@@ -1,6 +1,8 @@
 # Architecture
 
-Strata has three parts: a small native **scanner** process that touches the disk, the Electron **main process** that orchestrates it, and the **UI** that turns a scan into maps and cleanup suggestions.
+Strata has three parts: a small **scanner** process that touches the disk, the Electron **main process** that orchestrates it, and the **UI** that turns a scan into maps and cleanup suggestions.
+
+The scanner has two implementations that speak the same protocol and write the same scan file: `scanner/StrataScan.cs` on Windows and `scanner/linux/` on Linux (see [Linux scanner](#linux-scanner-scannerlinux)). The main process and the UI only differ in small platform details: the path separator, case-sensitivity, drive names, and Recycle Bin vs. Trash.
 
 ```mermaid
 flowchart LR
@@ -93,6 +95,18 @@ names (UTF-8, NUL-separated)
 
 Saved scans live in the data folder (`scans/`), alongside an `index.json` of recent scans.
 
+## Linux scanner (`scanner/linux/`)
+
+Plain JavaScript (`strata-scan.js`), run by the Node.js built into Electron: the main process spawns its own executable with `ELECTRON_RUN_AS_NODE=1`. Nothing is compiled, so the same files work on every distribution. Packaged builds ship them in `resources/scanner/`. Commands, messages and the `.strata` file are the same as on Windows; `--mft` is accepted and ignored.
+
+- **`info`** lists the mounted file systems from `/proc/self/mountinfo`. Pseudo file systems (proc, sysfs, tmpfs, overlay, squashfs…) and system mounts (`/boot`, `/snap`, container storage…) are left out; drives mounted under `/run/media` are kept. Sizes come from `statfs`; bus, SSD/HDD and removable come from `/sys/class/block` (through partitions, LVM and LUKS to the disk), labels from `/dev/disk/by-label`. `admin` means running as root. Drives have `letter: null`; the UI names them by label or mount point.
+- **`scan`** keeps the folder walk's structure (a stack of folders, depth-first, parents before children), but folders are listed by a pool of worker threads with blocking `readdir` + `lstat`, which is several times faster than a promise per file while still reading several folders at once. The main thread builds the node columns, the progress, the snapshots and the stdin commands.
+  - It stays on one file system: other mount points inside the scanned folder are listed (as links) but not entered, so `/proc`, `/sys` and other drives aren't counted.
+  - Hidden means a name starting with `.`. Symlinks are links: not followed unless *Follow* is on, and then each target folder (by device and inode) is entered once.
+  - Hard-linked files count once, and a file counts its allocated size when that's smaller than its length (sparse files).
+- **`delete`** moves items to the **freedesktop.org Trash** (`trash.js`): the home Trash (`~/.local/share/Trash`) when the item is on the same file system, otherwise `$topdir/.Trash/$uid` or `$topdir/.Trash-$uid` on the item's own drive. A `.trashinfo` file with the original path and date is written first, as the spec asks. Permanent deletion removes links without following them.
+- **Restore** (main process) reads those `.trashinfo` files to find where an item came from, then moves it back.
+
 ## Main process (`src/main/`)
 
 - Creates the window (sandboxed renderer, context isolation, no Node in the UI) and exposes a narrow API through `preload.js`.
@@ -102,7 +116,7 @@ Saved scans live in the data folder (`scans/`), alongside an `index.json` of rec
   - **Recycle Bin:** `SHFileOperation` in batches, with a warning if something is too big to recycle.
   - **Permanent:** a recursive delete that removes links without following them.
 - **Restore:** reads the Recycle Bin's `$I` metadata files to find where an item came from, then moves the matching `$R` file back.
-- **Restart as administrator:** relaunches through `Start-Process -Verb RunAs` and passes the pending scan along.
+- **Restart as administrator:** relaunches through `Start-Process -Verb RunAs` and passes the pending scan along. Windows only: Linux has no file-table fast scan, and GUI apps shouldn't run as root.
 
 ## UI (`src/renderer/`)
 

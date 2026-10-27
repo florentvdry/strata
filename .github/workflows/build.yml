@@ -41,3 +41,44 @@ jobs:
             dist/Strata-*-Portable.exe
           if-no-files-found: error
           retention-days: 14
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      # rpmbuild for the .rpm, bsdtar for the Arch package.
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends rpm libarchive-tools
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check renderer syntax
+        run: for f in $(find src scanner -name '*.js'); do node --check "$f"; done
+
+      - name: Check import map and CSP hash
+        run: npm run check
+
+      - name: Test the Linux scanner
+        run: npm run test:scanner
+
+      - name: Build AppImage, deb, rpm, pacman and tar.gz
+        run: npm run dist:linux
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: strata-linux
+          path: |
+            dist/Strata-*.AppImage
+            dist/Strata-*.deb
+            dist/Strata-*.rpm
+            dist/Strata-*.pacman
+            dist/Strata-*.tar.gz
+          if-no-files-found: error
+          retention-days: 14

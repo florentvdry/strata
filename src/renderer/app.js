@@ -2,6 +2,7 @@ import { render } from 'preact';
 import { useEffect } from 'preact/hooks';
 import { html } from './lib/html.js';
 import { store, useStore } from './lib/store.js';
+import { isWin, parentPath } from './lib/platform.js';
 import { Modals } from './components/ui.js';
 import { Start } from './views/start.js';
 import { Scanning } from './views/scanning.js';
@@ -53,8 +54,8 @@ function useDrop() {
       let p = api.pathForFile(file);
       if (!p) return;
       const st = await api.stat(p);
-      if (st && !st.isDir) p = p.slice(0, p.lastIndexOf('\\')) || p;
-      A.requestScan(p.length === 2 ? p + '\\' : p);
+      if (st && !st.isDir) p = parentPath(p);
+      A.requestScan(isWin && p.length === 2 ? p + '\\' : p);
     };
     window.addEventListener('dragenter', enter);
     window.addEventListener('dragover', over);

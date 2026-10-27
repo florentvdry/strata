@@ -1,4 +1,4 @@
-// Number, size and date formatting. Sizes use 1024-based units, labelled like Windows does (GB, TB).
+// Number, size and date formatting. Sizes use 1024-based units, labelled like Windows and most Linux file managers do (GB, TB).
 const UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
 
 export function bytesParts(b, digits) {
@@ -86,10 +86,11 @@ export function fmtMonth(unixSec) {
 // "C:\Users\alex\AppData\Local\Packages\…\LocalCache\Roaming\cache_0042.bin"
 export function middleEllipsis(p, max = 96) {
   if (!p || p.length <= max) return p || '';
-  const parts = p.split('\\');
+  const sep = p.includes('\\') ? '\\' : '/';
+  const parts = p.split(sep);
   let head = parts.slice(0, 5), tail = parts.slice(-3);
-  let s = [...head, '…', ...tail].join('\\');
-  while (s.length > max && head.length > 2) { head = head.slice(0, -1); s = [...head, '…', ...tail].join('\\'); }
+  let s = [...head, '…', ...tail].join(sep);
+  while (s.length > max && head.length > 2) { head = head.slice(0, -1); s = [...head, '…', ...tail].join(sep); }
   return s.length > max ? '…' + p.slice(-(max - 1)) : s;
 }
 
