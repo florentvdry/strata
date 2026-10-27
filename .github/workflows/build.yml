@@ -3,7 +3,9 @@ name: Build
 on:
   push:
     branches: [main]
+    paths-ignore: ['website/**', 'docs/**', '**/*.md', '.github/workflows/website.yml', '.github/workflows/changelog.yml']
   pull_request:
+    paths-ignore: ['website/**', 'docs/**', '**/*.md', '.github/workflows/website.yml', '.github/workflows/changelog.yml']
   workflow_dispatch:
   # The Release workflow builds with the same jobs, with signing on.
   workflow_call:
@@ -20,7 +22,14 @@ on:
 permissions:
   contents: read
 
+# A new push to a pull request makes the previous run pointless.
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
+  # Pull requests get a quick debug build that still runs the smoke test; main, manual runs and releases build and package the real installers.
+  QUICK: ${{ github.event_name == 'pull_request' }}
   # Makes `tauri build` write the .sig files the updater verifies (needs TAURI_SIGNING_PRIVATE_KEY).
   TAURI_RELEASE_CONFIG: ${{ inputs.release && '--config tauri.release.conf.json' || '' }}
   TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -46,6 +55,7 @@ jobs:
           workspaces: |
             scanner
             src/app
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install dependencies
         run: npm ci
@@ -85,16 +95,24 @@ jobs:
           cargo test --locked
 
       - name: Build the installer
+        if: env.QUICK != 'true'
         run: npx tauri build --bundles nsis ${{ env.TAURI_RELEASE_CONFIG }}
         working-directory: src/app
 
+      - name: Build the app (debug, no installer)
+        if: env.QUICK == 'true'
+        run: npx tauri build --debug --no-bundle
+        working-directory: src/app
+
       - name: Smoke test the built app
-        run: node scripts/smoke-test.js
+        run: node scripts/smoke-test.js ${{ env.QUICK == 'true' && 'src/app/target/debug/strata.exe' || '' }}
 
       - name: Package installer and portable app
+        if: env.QUICK != 'true'
         run: node scripts/package-release.js
 
       - uses: actions/upload-artifact@v7
+        if: env.QUICK != 'true'
         with:
           name: strata-windows
           path: |
@@ -127,6 +145,7 @@ jobs:
           workspaces: |
             scanner
             src/app
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       # WebKitGTK and GTK for the app (built on 22.04 so it runs on 22.04 and newer), musl-tools for the scanner,
       # ntfs-3g and zstd for fresh NTFS test images and the pacman package, xvfb for the smoke test.
@@ -174,8 +193,14 @@ jobs:
           cargo clippy --locked --all-targets -- -D warnings
           cargo test --locked
 
+      - name: Build the app (debug, no packages)
+        if: env.QUICK == 'true'
+        run: npx tauri build --debug --no-bundle
+        working-directory: src/app
+
       # An RPM version can't contain "-", so pre-releases (0.3.0-beta.1) are built without the .rpm.
       - name: Build deb, rpm and AppImage
+        if: env.QUICK != 'true'
         run: |
           bundles=deb,rpm,appimage
           case "$(node -p "require('../../package.json').version")" in *-*) bundles=deb,appimage ;; esac
@@ -183,12 +208,14 @@ jobs:
         working-directory: src/app
 
       - name: Smoke test the built app
-        run: xvfb-run -a node scripts/smoke-test.js
+        run: xvfb-run -a node scripts/smoke-test.js ${{ env.QUICK == 'true' && 'src/app/target/debug/strata' || '' }}
 
       - name: Package everything, with the pacman package and the tarball
+        if: env.QUICK != 'true'
         run: node scripts/package-release.js
 
       - uses: actions/upload-artifact@v7
+        if: env.QUICK != 'true'
         with:
           name: strata-linux
           path: |
@@ -199,26 +226,3 @@ jobs:
             dist/Strata-*.tar.gz
           if-no-files-found: error
           retention-days: 14
-
-  # A short run of each fuzz target on the NTFS file-table reader: damaged data must never crash it.
-  fuzz:
-    if: ${{ !inputs.release }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: dtolnay/rust-toolchain@nightly
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: scanner/fuzz
-
-      - name: Install cargo-fuzz
-        run: cargo install cargo-fuzz --locked
-
-      - name: Fuzz
-        working-directory: scanner
-        run: |
-          python3 fuzz/seed-corpus.py
-          cargo fuzz run mft_record -- -max_total_time=90 -rss_limit_mb=2048
-          cargo fuzz run mft_volume -- -max_total_time=60 -max_len=262144 -rss_limit_mb=2048

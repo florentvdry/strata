@@ -49,5 +49,9 @@ const started = Date.now();
 
 function finish(code) {
   try { app.kill(); } catch { /* gone */ }
-  setTimeout(() => { fs.rmSync(tmp, { recursive: true, force: true }); process.exit(code); }, 500);
+  // WebView2 can still hold its profile files for a moment on Windows; the result is already known, so a leftover temp folder isn't a failure.
+  setTimeout(() => {
+    try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 }); } catch (e) { console.warn(`Couldn't remove ${tmp}: ${e.code}`); }
+    process.exit(code);
+  }, 500);
 }

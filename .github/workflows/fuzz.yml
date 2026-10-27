@@ -1,0 +1,45 @@
+name: Fuzz
+
+# A short run of each fuzz target on the NTFS file-table reader: damaged data must never crash it.
+# Only when the scanner changes (and once a week), so ordinary pull requests don't wait for it.
+on:
+  push:
+    branches: [main]
+    paths: ['scanner/**', '.github/workflows/fuzz.yml']
+  pull_request:
+    paths: ['scanner/**', '.github/workflows/fuzz.yml']
+  schedule:
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fuzz-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@nightly
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: scanner/fuzz
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      # A prebuilt binary: compiling cargo-fuzz from source took longer than the fuzzing itself.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-fuzz
+
+      - name: Fuzz
+        working-directory: scanner
+        run: |
+          python3 fuzz/seed-corpus.py
+          cargo fuzz run mft_record -- -max_total_time=90 -rss_limit_mb=2048
+          cargo fuzz run mft_volume -- -max_total_time=60 -max_len=262144 -rss_limit_mb=2048
