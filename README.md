@@ -181,7 +181,7 @@ npm start
 | `npm run pack:linux` | Builds an unpacked Linux app into `dist/linux-unpacked/` |
 | `npm run test:rust` | The scanner's unit tests, including the NTFS fast scan on disk images |
 | `npm run test:scanner` | Runs the built scanner against a temporary folder tree: scan, pause, snapshot, duplicates, Recycle Bin / Trash, restore |
-| `npm run parity -- <old scanner>` | Compares `bin/strata-scan` with the scanner it replaced (`bin/StrataScan.exe` from `npm run build:legacy-scanner`, or `scanner/linux/strata-scan.js`) item by item |
+| `npm run check:fast-scan` | Windows, as administrator: checks that the NTFS fast scan finds the same tree as a folder walk |
 | `npm run screenshots` | Regenerates `docs/screenshots/` from a made-up drive |
 | `npm run build:icon` | Redraws `assets/icon.png` and `assets/icon.ico` |
 

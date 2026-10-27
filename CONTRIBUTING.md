@@ -59,7 +59,7 @@ If Electron didn't download during `npm install` (newer npm versions can block i
 
 ## Testing your change
 
-The scanner has automated tests: `npm run test:rust` (unit tests, including the NTFS fast scan on disk images) and `npm run test:scanner` (the built scanner against a temporary folder tree). CI also compares it with the scanner it replaced (`npm run parity`) and fuzzes the NTFS reader (`cargo +nightly fuzz run mft_record` in `scanner/`). There's no automated UI test suite yet, so please check the rest by hand. A good minimum:
+The scanner has automated tests: `npm run test:rust` (unit tests, including the NTFS fast scan on disk images) and `npm run test:scanner` (the built scanner against a temporary folder tree). CI also checks that the NTFS fast scan matches a folder walk on a real `C:` (`npm run check:fast-scan`) and fuzzes the NTFS reader (`cargo +nightly fuzz run mft_record` in `scanner/`). There's no automated UI test suite yet, so please check the rest by hand. A good minimum:
 
 1. `npm run check` if you touched dependencies or `src/renderer/index.html`. The UI loads Preact and htm through an import map protected by a CSP hash, and `node scripts/check-renderer.js --fix` updates that hash after you edit the map.
 2. `npm start`, then scan a small folder and a drive. Try both normal and, if you can, fast scan as administrator.

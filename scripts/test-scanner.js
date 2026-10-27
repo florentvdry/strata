@@ -4,8 +4,7 @@
 //
 //   node scripts/test-scanner.js [scanner]
 //
-// [scanner] defaults to bin/strata-scan(.exe). The scanners being replaced can be checked too, for comparison:
-// bin/StrataScan.exe (Windows) and scanner/linux/strata-scan.js (Linux). They don't have trash-list and restore.
+// [scanner] defaults to bin/strata-scan(.exe).
 const { spawn, execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
@@ -16,8 +15,6 @@ const { parseStrata } = require('./lib/strata-file');
 const IS_WIN = process.platform === 'win32';
 const ROOT = path.join(__dirname, '..');
 const SCANNER = path.resolve(process.argv[2] || path.join(ROOT, 'bin', IS_WIN ? 'strata-scan.exe' : 'strata-scan'));
-const IS_JS = SCANNER.endsWith('.js');
-const LEGACY = IS_JS || /StrataScan\.exe$/i.test(SCANNER);
 
 if (!fs.existsSync(SCANNER)) { console.error(`Scanner not found: ${SCANNER} (run npm run build:scanner)`); process.exit(1); }
 
@@ -29,7 +26,7 @@ const env = { ...process.env, XDG_DATA_HOME: dataHome };
 
 function run(args, { onLine, input, timeout = 120000 } = {}) {
   return new Promise((resolve, reject) => {
-    const p = IS_JS ? spawn(process.execPath, [SCANNER, ...args], { env }) : spawn(SCANNER, args, { env, windowsHide: true });
+    const p = spawn(SCANNER, args, { env, windowsHide: true });
     const timer = setTimeout(() => { p.kill(); reject(new Error(`timeout: ${args.join(' ')}`)); }, timeout);
     const msgs = [];
     let buf = '', err = '';
@@ -62,7 +59,7 @@ const linkDir = (target, at) => fs.symlinkSync(target, at, IS_WIN ? 'junction' :
 const hide = (p) => { if (IS_WIN) execFileSync('attrib', ['+h', p]); };
 
 async function main() {
-  console.log(`Testing ${path.relative(ROOT, SCANNER) || SCANNER}${LEGACY ? ' (legacy scanner)' : ''}`);
+  console.log(`Testing ${path.relative(ROOT, SCANNER) || SCANNER}`);
   // ── fixture ──
   write('video/movie.mkv', 300000);
   write('video/clip.mp4', 4096);
@@ -102,7 +99,7 @@ async function main() {
     for (const k of ['label', 'kind', 'bus', 'media']) assert.ok(k in d, `drive has ${k}`);
   }
   assert.ok(inf.drives.some((d) => d.system), 'one drive holds the system');
-  if (!LEGACY) assert.ok(Array.isArray(inf.trashDirs), 'trashDirs');
+  assert.ok(Array.isArray(inf.trashDirs), 'trashDirs');
   console.log(`info: ${inf.drives.map((d) => `${d.root} (${d.fs}${d.bus ? `, ${d.bus}` : ''}${d.media ? `, ${d.media}` : ''})`).join(', ')}`);
 
   // ── scan, without hidden files and links ──
@@ -118,7 +115,7 @@ async function main() {
   assert.ok(s.size[mkv] > 0 && s.size[mkv] <= 300000 + 4096, 'file size');
   assert.strictEqual(s.type[mkv], 1, 'mkv is video');
   assert.ok(s.mtime[mkv] > Date.now() / 1000 - 3600 && s.mtime[mkv] < Date.now() / 1000 + 60, 'modification time');
-  if (!IS_WIN || !LEGACY) assert.strictEqual(s.type[s.byPath.get('lib/libfoo.so.1.2')], 2, 'versioned .so is an app file');
+  assert.strictEqual(s.type[s.byPath.get('lib/libfoo.so.1.2')], 2, 'versioned .so is an app file');
   assert.ok(s.byPath.has('café \u{1F600}/naïve.txt'), 'non-ASCII names');
   if (!IS_WIN) {
     const clips = [s.byPath.get('video/clip.mp4'), s.byPath.get('video/clip-hardlink.mp4')].map((i) => s.size[i]);
@@ -187,32 +184,26 @@ async function main() {
   const r1 = (await run(['delete', list, 'recycle'], { timeout: 60000 })).filter((m) => m.type === 'result');
   assert.ok(r1[0].ok && r1[0].remaining === 0 && r1[0].error === null, `moved to the ${IS_WIN ? 'Recycle Bin' : 'Trash'}: ${r1[0].error}`);
   assert.ok(!fs.existsSync(trashed));
-  if (!LEGACY) {
-    const entries = (await run(['trash-list', trashed])).filter((m) => m.type === 'entry' && m.original === trashed);
-    assert.strictEqual(entries.length, 1, 'found in the Recycle Bin / Trash');
-    const e = entries[0];
-    assert.ok(Math.abs(e.deletedAt - Date.now()) < 120000, `deletion date ${e.deletedAt}`);
-    assert.ok(fs.existsSync(path.join(e.data, 'a', 'report.pdf')), 'content kept');
-    if (!IS_WIN) assert.ok(e.info.startsWith(path.join(dataHome, 'Trash') + path.sep), `home Trash used, got ${e.info}`);
-    // Restore puts it back.
-    fs.writeFileSync(list, e.info);
-    const rr = (await run(['restore', list])).filter((m) => m.type === 'result');
-    assert.ok(rr[0].ok && rr[0].path === trashed, `restored: ${rr[0].error}`);
-    assert.ok(fs.existsSync(path.join(trashed, 'a', 'report.pdf')) && !fs.existsSync(e.info), 'back in place');
-    // Restoring over something that exists is refused.
-    fs.writeFileSync(list, trashed);
-    await run(['delete', list, 'recycle']);
-    fs.mkdirSync(trashed);
-    const again = (await run(['trash-list', trashed])).filter((m) => m.type === 'entry' && m.original === trashed);
-    fs.writeFileSync(list, again[0].info);
-    const rr2 = (await run(['restore', list])).filter((m) => m.type === 'result');
-    assert.ok(!rr2[0].ok && rr2[0].error, 'restore refused when the place is taken');
-    fs.rmSync(trashed, { recursive: true });
-  } else if (!IS_WIN) {
-    const { trashEntries } = require('../scanner/linux/trash');
-    process.env.XDG_DATA_HOME = dataHome;
-    assert.strictEqual(trashEntries(trashed).filter((e) => e.original === trashed).length, 1, 'trashinfo found');
-  }
+  const entries = (await run(['trash-list', trashed])).filter((m) => m.type === 'entry' && m.original === trashed);
+  assert.strictEqual(entries.length, 1, 'found in the Recycle Bin / Trash');
+  const e = entries[0];
+  assert.ok(Math.abs(e.deletedAt - Date.now()) < 120000, `deletion date ${e.deletedAt}`);
+  assert.ok(fs.existsSync(path.join(e.data, 'a', 'report.pdf')), 'content kept');
+  if (!IS_WIN) assert.ok(e.info.startsWith(path.join(dataHome, 'Trash') + path.sep), `home Trash used, got ${e.info}`);
+  // Restore puts it back.
+  fs.writeFileSync(list, e.info);
+  const rr = (await run(['restore', list])).filter((m) => m.type === 'result');
+  assert.ok(rr[0].ok && rr[0].path === trashed, `restored: ${rr[0].error}`);
+  assert.ok(fs.existsSync(path.join(trashed, 'a', 'report.pdf')) && !fs.existsSync(e.info), 'back in place');
+  // Restoring over something that exists is refused.
+  fs.writeFileSync(list, trashed);
+  await run(['delete', list, 'recycle']);
+  fs.mkdirSync(trashed);
+  const again = (await run(['trash-list', trashed])).filter((m) => m.type === 'entry' && m.original === trashed);
+  fs.writeFileSync(list, again[0].info);
+  const rr2 = (await run(['restore', list])).filter((m) => m.type === 'result');
+  assert.ok(!rr2[0].ok && rr2[0].error, 'restore refused when the place is taken');
+  fs.rmSync(trashed, { recursive: true });
   if (!IS_WIN) {
     // Trashing a second item with the same name gets a new name.
     fs.mkdirSync(trashed);

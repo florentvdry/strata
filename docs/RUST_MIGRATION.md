@@ -2,10 +2,10 @@
 
 ## État (octobre 2026)
 
-Le plan est implémenté sur la branche `claude/quirky-gates-ytqdj0`, phases 0 à 6 et le début de la phase 7 (version `0.2.0-beta.1`). Ce qui reste demande des machines réelles ou des retours d'utilisateurs :
+Le plan est implémenté sur la branche `claude/quirky-gates-ytqdj0` (PR florentvdry/strata#6), version `0.2.0-beta.1`. Les anciens scanners ont été supprimés dans la même PR, sans attendre la bêta : la CI les a comparés au scanner Rust (aucune différence) avant leur suppression, et ils restent dans l'historique git. Ce qui reste demande des machines réelles :
 
 - les vérifications manuelles de la phase 6 (Windows 10/11, Ubuntu, Fedora, Arch) ;
-- la publication de la bêta, puis la suppression de `scanner/StrataScan.cs` et `scanner/linux/` (phase 7, étape 2).
+- la publication de la bêta, puis de la `0.2.0`.
 
 Écarts avec le plan, décidés pendant l'implémentation :
 

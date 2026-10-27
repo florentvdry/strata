@@ -51,12 +51,9 @@ jobs:
       - name: Test the scanner end to end
         run: npm run test:scanner
 
-      # The C# scanner the Rust one replaces, kept until 0.2.0 to compare results.
-      - name: Build the old scanner
-        run: npm run build:legacy-scanner
-
-      - name: Same results as the old scanner, fast scan same as a folder walk
-        run: node scripts/parity.js bin/StrataScan.exe --live --bench
+      # The runner is administrator and C: is NTFS.
+      - name: Fast scan finds the same tree as a folder walk
+        run: node scripts/check-fast-scan.js --bench
 
       - name: Build installer and portable app
         run: npm run dist
@@ -98,7 +95,7 @@ jobs:
         run: npm ci
 
       - name: Check renderer syntax
-        run: for f in $(find src scripts scanner/linux -name '*.js'); do node --check "$f"; done
+        run: for f in $(find src scripts -name '*.js'); do node --check "$f"; done
 
       - name: Check import map and CSP hash
         run: npm run check
@@ -121,10 +118,6 @@ jobs:
 
       - name: Test the scanner end to end
         run: npm run test:scanner
-
-      # The JavaScript scanner the Rust one replaces, kept until 0.2.0 to compare results.
-      - name: Same results as the old scanner
-        run: STRATA_PARITY_MOUNT=1 node scripts/parity.js scanner/linux/strata-scan.js --live --bench
 
       - name: Build AppImage, deb, rpm, pacman and tar.gz
         run: npm run dist:linux

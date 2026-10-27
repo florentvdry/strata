@@ -145,10 +145,6 @@ Saved scans live in the data folder (`scans/`), alongside an `index.json` of rec
 - **Linux** (`platform/linux/trash.rs`): the **freedesktop.org Trash**. The home Trash (`$XDG_DATA_HOME/Trash`, usually `~/.local/share/Trash`) when the item is on the same file system, otherwise `$topdir/.Trash/$uid` (when it's a sticky folder, not a link) or `$topdir/.Trash-$uid` on the item's own drive. A `.trashinfo` file with the original path and the local date is reserved with `O_EXCL` before the move, as the spec asks.
 - **Permanent** deletion is shared (`delete.rs`): recursive, links and junctions removed as links, never followed; read-only attributes cleared on Windows.
 
-### The old scanners
-
-`scanner/StrataScan.cs` (C#, Windows) and `scanner/linux/` (JavaScript, Linux) are what `strata-scan` replaced. The app doesn't use them anymore; they stay until 0.2.0 so CI can check that both give the same results ([`scripts/parity.js`](../scripts/parity.js), which uses [`scripts/compare-scans.js`](../scripts/compare-scans.js)).
-
 ## Main process (`src/main/`)
 
 - Creates the window (sandboxed renderer, context isolation, no Node in the UI) and exposes a narrow API through `preload.js`.

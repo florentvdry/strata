@@ -8,7 +8,7 @@ The contract between the Electron main process and the scanner (`strata-scan`, b
 - List files (for `dupes`, `delete`, `restore`) are UTF-8 text, one entry per line.
 - Exit codes: `0` success, `1` error (an `error` message says why), `2` missing or unknown command.
 
-The old scanners (`scanner/StrataScan.cs` on Windows, `scanner/linux/` on Linux) speak the same protocol, without `trash-list`, `restore` and `trashDirs`. They stay in the repository until 0.2.0 so CI can compare results ([`scripts/parity.js`](../scripts/parity.js)).
+Strata 0.1.0's scanners (C# on Windows, JavaScript on Linux) spoke the same protocol, without `trash-list`, `restore` and `trashDirs`, and wrote the same scan file.
 
 ## `info`
 
