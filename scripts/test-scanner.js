@@ -21,7 +21,9 @@ const LEGACY = IS_JS || /StrataScan\.exe$/i.test(SCANNER);
 
 if (!fs.existsSync(SCANNER)) { console.error(`Scanner not found: ${SCANNER} (run npm run build:scanner)`); process.exit(1); }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'strata-test-'));
+// The real path: on Windows the temp folder can be an 8.3 short name (C:\Users\RUNNER~1), which the Recycle Bin
+// doesn't record.
+const tmp = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'strata-test-')));
 const dataHome = path.join(tmp, 'xdg');
 const env = { ...process.env, XDG_DATA_HOME: dataHome };
 
