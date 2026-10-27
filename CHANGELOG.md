@@ -5,6 +5,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Fixed
+
+- A finished scan no longer stays stuck on "100%": the map now opens as soon as the scan ends. If loading the results ever fails, Strata shows the error instead of freezing.
+
+### Internal
+
+- `npm start` builds the scanner again when the project path contains a space (Windows).
+
 ## [0.2.0-beta.1] - 2026-10-27
 
 ### Changed
