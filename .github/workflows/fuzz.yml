@@ -32,7 +32,8 @@ jobs:
           workspaces: scanner/fuzz
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
-      # A prebuilt binary: compiling cargo-fuzz from source took longer than the fuzzing itself.
+      # A prebuilt binary: compiling cargo-fuzz from source took longer than the fuzzing itself. It is a musl build and
+      # would default to the musl target, so the target is named below.
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-fuzz
@@ -41,5 +42,5 @@ jobs:
         working-directory: scanner
         run: |
           python3 fuzz/seed-corpus.py
-          cargo fuzz run mft_record -- -max_total_time=90 -rss_limit_mb=2048
-          cargo fuzz run mft_volume -- -max_total_time=60 -max_len=262144 -rss_limit_mb=2048
+          cargo fuzz run --target x86_64-unknown-linux-gnu mft_record -- -max_total_time=90 -rss_limit_mb=2048
+          cargo fuzz run --target x86_64-unknown-linux-gnu mft_volume -- -max_total_time=60 -max_len=262144 -rss_limit_mb=2048
