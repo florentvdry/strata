@@ -1,3 +1,5 @@
+import { t } from './i18n.js';
+
 // What differs between Windows and Linux in paths and wording.
 const platform = (typeof window !== 'undefined' && window.strata && window.strata.platform) || 'win32';
 
@@ -5,8 +7,9 @@ export const isWin = platform === 'win32';
 export const sep = isWin ? '\\' : '/';
 // Paths are case-insensitive on Windows only.
 export const fold = isWin ? (s) => s.toLowerCase() : (s) => s;
-export const TRASH = isWin ? 'Recycle Bin' : 'Trash';
-export const FILE_MANAGER = isWin ? 'Explorer' : 'file manager';
+// Translated on use: the language can change while the app runs.
+export const trash = () => (isWin ? t('Recycle Bin') : t('Trash'));
+export const fileManager = () => (isWin ? t('Explorer') : t('file manager'));
 
 export function joinPath(dir, name) {
   return dir.endsWith(sep) ? dir + name : dir + sep + name;

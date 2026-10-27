@@ -1,14 +1,16 @@
+import { t } from './i18n.js';
+
 // File-type categories. Indices match scanner/src/types.rs.
 export const TYPES = [
-  { id: 'other',   c: '#7B8390', fg: '#0E1014', l: 'Other' },
-  { id: 'video',   c: '#3B82F6', fg: '#071226', l: 'Video' },
-  { id: 'app',     c: '#EC6FB0', fg: '#2A0718', l: 'Games & apps' },
-  { id: 'system',  c: '#5B6576', fg: '#F4F6F9', l: 'System' },
-  { id: 'image',   c: '#F59E0B', fg: '#2A1700', l: 'Images' },
-  { id: 'archive', c: '#A78BFA', fg: '#170B33', l: 'Archives & disk images' },
-  { id: 'code',    c: '#34D399', fg: '#05251A', l: 'Code & packages' },
-  { id: 'audio',   c: '#22C3D8', fg: '#04222A', l: 'Audio' },
-  { id: 'doc',     c: '#E9D27A', fg: '#2A2205', l: 'Documents' },
+  { id: 'other',   c: '#7B8390', fg: '#0E1014', get l() { return t('Other'); } },
+  { id: 'video',   c: '#3B82F6', fg: '#071226', get l() { return t('Video'); } },
+  { id: 'app',     c: '#EC6FB0', fg: '#2A0718', get l() { return t('Games & apps'); } },
+  { id: 'system',  c: '#5B6576', fg: '#F4F6F9', get l() { return t('System'); } },
+  { id: 'image',   c: '#F59E0B', fg: '#2A1700', get l() { return t('Images'); } },
+  { id: 'archive', c: '#A78BFA', fg: '#170B33', get l() { return t('Archives & disk images'); } },
+  { id: 'code',    c: '#34D399', fg: '#05251A', get l() { return t('Code & packages'); } },
+  { id: 'audio',   c: '#22C3D8', fg: '#04222A', get l() { return t('Audio'); } },
+  { id: 'doc',     c: '#E9D27A', fg: '#2A2205', get l() { return t('Documents'); } },
 ];
 export const TYPE_COUNT = TYPES.length;
 export const T = Object.fromEntries(TYPES.map((t, i) => [t.id, i]));

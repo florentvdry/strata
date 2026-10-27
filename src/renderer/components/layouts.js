@@ -2,6 +2,7 @@
 import { TYPES } from '../lib/types.js';
 import { squarify } from '../lib/squarify.js';
 import { fmtBytes } from '../lib/format.js';
+import { t } from '../lib/i18n.js';
 
 const BG = '#0B0D10';
 const MIN_AREA = 3;      // px² below which children are lumped together
@@ -302,7 +303,7 @@ export function layoutSunburst(tree, root, W, H, mark) {
       if (root !== 0) {
         ctx.font = '400 11px Geist, system-ui, sans-serif';
         ctx.fillStyle = '#7B8390';
-        ctx.fillText('click to go up', cx, cy + 27);
+        ctx.fillText(t('click to go up'), cx, cy + 27);
       }
       ctx.textAlign = 'start';
       ctx.textBaseline = 'alphabetic';

@@ -19,9 +19,10 @@ function createStore(initial) {
 
 export const store = createStore({
   ready: false,
+  locale: 'en', // the language in use; changing it re-renders everything that calls t()
   screen: 'start',
   info: { admin: false, version: '0.0.0', home: '', temp: '' },
-  settings: { accent: '#C6F432', shading: true, scan: { mft: true, hidden: true, links: false }, view: 'treemap', updates: { check: null, channel: 'stable', lastCheck: 0, skipped: '' }, lastSeenVersion: '' },
+  settings: { language: 'auto', accent: '#C6F432', shading: true, scan: { mft: true, hidden: true, links: false }, view: 'treemap', updates: { check: null, channel: 'stable', lastCheck: 0, skipped: '' }, lastSeenVersion: '' },
   drives: null, // null until the first listing arrives
   recent: [],
   scan: null,

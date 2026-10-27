@@ -2,8 +2,9 @@
 import { store, toast } from './lib/store.js';
 import { parseScan } from './lib/tree.js';
 import { buildSuggestions, userItem, dupeCandidates } from './lib/cleanup.js';
-import { fmtBytes, plural } from './lib/format.js';
-import { isWin, fold, isUnderPath, TRASH, FILE_MANAGER } from './lib/platform.js';
+import { fmtBytes } from './lib/format.js';
+import { setLocale, t } from './lib/i18n.js';
+import { isWin, fold, isUnderPath, trash, fileManager } from './lib/platform.js';
 import CHANGELOG from './lib/changelog-data.js';
 import { between } from './lib/changelog.js';
 
@@ -20,7 +21,8 @@ export async function init() {
   api.onDeleteProgress((p) => { if (s().modal && s().modal.kind === 'busy') store.set({ modal: { ...s().modal, ...p } }); });
   const [info, settings, recent] = await Promise.all([api.appInfo(), api.settings(), api.recent()]);
   applyAccent(settings.accent);
-  store.set({ info, settings, recent, ready: true });
+  const locale = await setLocale(settings.language);
+  store.set({ info, settings, recent, locale, ready: true });
   await refreshDrives();
   const pending = await api.pendingScan();
   if (pending) { startScan(pending.root, pending.options); return; }
@@ -34,7 +36,8 @@ export function applyAccent(c) {
 export async function saveSettings(patch) {
   const settings = await api.saveSettings(patch);
   if (patch.accent) applyAccent(settings.accent);
-  store.set({ settings });
+  const locale = patch.language ? await setLocale(settings.language) : s().locale;
+  store.set({ settings, locale });
 }
 
 export function setScanOption(key, value) {
@@ -42,7 +45,7 @@ export function setScanOption(key, value) {
 }
 
 export async function refreshDrives(force = true) {
-  try { store.set({ drives: await api.drives(force) }); } catch (e) { toast(`Couldn't list drives: ${e.message}`); }
+  try { store.set({ drives: await api.drives(force) }); } catch (e) { toast(t("Couldn't list drives: {error}", { error: e.message })); }
 }
 
 export async function refreshRecent() {
@@ -58,7 +61,7 @@ export function closeModal() { store.set({ modal: null }); }
 
 export async function relaunchAsAdmin(pending) {
   const ok = await api.relaunchAdmin(pending || null);
-  if (!ok) toast('Administrator rights were not granted.');
+  if (!ok) toast(t('Administrator rights were not granted.'));
 }
 
 // ───────────── right-click menu ─────────────
@@ -84,7 +87,7 @@ export function closeMenu(id = null) {
 
 export function openReleaseNotes(all = true) {
   const entries = all ? CHANGELOG : CHANGELOG.slice(0, 1);
-  openModal({ kind: 'whatsnew', entries, title: all ? 'Release notes' : `What's new in Strata ${s().info.version}` });
+  openModal({ kind: 'whatsnew', entries, title: all ? t('Release notes') : t("What's new in Strata {version}", { version: s().info.version }) });
 }
 
 // After an update, once: what changed since the version the person last ran.
@@ -94,7 +97,7 @@ function initUpdates(version, settings) {
   const seen = settings.lastSeenVersion;
   if (seen !== version) saveSettings({ lastSeenVersion: version });
   const news = seen ? between(CHANGELOG, seen, version) : [];
-  if (news.length) openModal({ kind: 'whatsnew', entries: news, title: `Strata ${version} is installed` });
+  if (news.length) openModal({ kind: 'whatsnew', entries: news, title: t('Strata {version} is installed', { version }) });
   else if (settings.updates.check === null) openModal({ kind: 'updatesAsk' });
 }
 
@@ -114,7 +117,7 @@ export async function checkForUpdates(show = true) {
     const u = await api.updateCheck();
     store.set({ update: u });
     if (show && u.phase === 'available') openModal({ kind: 'update' });
-    else if (show && u.phase === 'uptodate') toast(`Strata ${s().info.version} is up to date.`);
+    else if (show && u.phase === 'uptodate') toast(t('Strata {version} is up to date.', { version: s().info.version }));
   } catch (e) { toast(e.message); }
 }
 
@@ -213,7 +216,7 @@ async function onScanDone(msg) {
   const viewing = s().partial && (s().screen === 'explorer' || s().screen === 'cleanup');
   loadTree(bytes, msg.id, { keep: viewing });
   store.set({ scan: null, screen: viewing ? s().screen : 'explorer' });
-  if (viewing) toast('Scan finished — the map now shows everything.');
+  if (viewing) toast(t('Scan finished — the map now shows everything.'));
   refreshDrives();
 }
 
@@ -242,11 +245,11 @@ export async function explorePartial() {
   setScan({ snapshotting: true });
   try {
     const bytes = await api.snapshot();
-    if (!bytes) throw new Error('The scan already finished.');
+    if (!bytes) throw new Error(t('The scan already finished.'));
     loadTree(bytes, `${sc.id}-partial`, { partial: true });
     store.set({ screen: 'explorer' });
   } catch (e) {
-    toast(`Couldn't open partial results: ${e.message}`);
+    toast(t("Couldn't open partial results: {error}", { error: e.message }));
   } finally {
     setScan({ snapshotting: false });
   }
@@ -384,14 +387,14 @@ export function showMore(i) {
 
 export function setPanel(panel) { setEx({ panel, ...(panel !== 'search' ? { query: '' } : {}) }); }
 export function setQuery(query) { setEx({ query, panel: query.trim() ? 'search' : 'folders' }); }
-export function setTypeFilter(t) { setEx({ typeFilter: s().ex.typeFilter === t ? -1 : t }); }
+export function setTypeFilter(ty) { setEx({ typeFilter: s().ex.typeFilter === ty ? -1 : ty }); }
 export function setView(view) { saveSettings({ view }); }
 
 export function reveal(path) { api.show(path); }
 
 export async function copyPath(path) {
   await api.copy(path);
-  toast('Path copied');
+  toast(t('Path copied'));
 }
 
 export async function nodeMenu(i) {
@@ -400,12 +403,12 @@ export async function nodeMenu(i) {
   const isDir = tree.isDir(i);
   const inCleanup = !!(it && s().cleanup.on[it.id]);
   const action = await showMenu([
-    isDir ? { id: 'zoom', label: 'Zoom in', enabled: i !== ex.zoom } : { id: 'open', label: 'Open' },
-    { id: 'show', label: isWin ? 'Show in Explorer' : `Show in ${FILE_MANAGER}` },
-    { id: 'copy', label: 'Copy path' },
+    isDir ? { id: 'zoom', label: t('Zoom in'), enabled: i !== ex.zoom } : { id: 'open', label: t('Open') },
+    { id: 'show', label: isWin ? t('Show in Explorer') : t('Show in {fileManager}', { fileManager: fileManager() }) },
+    { id: 'copy', label: t('Copy path') },
     { separator: true },
-    { id: 'cleanup', label: inCleanup ? 'Remove from cleanup' : 'Add to cleanup', enabled: i !== 0 },
-    { id: 'trash', label: `Move to ${TRASH}`, enabled: i !== 0 },
+    { id: 'cleanup', label: inCleanup ? t('Remove from cleanup') : t('Add to cleanup'), enabled: i !== 0 },
+    { id: 'trash', label: t('Move to {trash}', { trash: trash() }), enabled: i !== 0 },
   ]);
   const p = tree.path(i);
   if (action === 'zoom') zoomTo(i);
@@ -433,14 +436,14 @@ export function toggleCleanupNode(i) {
   const it = itemForNode(i);
   if (it) {
     setItem(it.id, !cleanup.on[it.id]);
-    toast(cleanup.on[it.id] ? 'Removed from cleanup' : 'Added to cleanup');
+    toast(cleanup.on[it.id] ? t('Removed from cleanup') : t('Added to cleanup'));
     return;
   }
   const path = tree.path(i);
   const ui = userItem(tree, i);
   store.set({ cleanup: { ...cleanup, user: [...cleanup.user, path], on: { ...cleanup.on, [ui.id]: true } } });
   rebuildCleanup();
-  toast(`Added ${tree.name(i)} to cleanup`);
+  toast(t('Added {name} to cleanup', { name: tree.name(i) }));
 }
 
 export function setItem(id, value) {
@@ -474,34 +477,34 @@ export async function runCleanup() {
   const chosen = cleanup.items.filter((it) => cleanup.on[it.id]);
   const targets = [];
   for (const it of chosen) {
-    it.targets.forEach((t, k) => targets.push({ ...t, name: it.name, size: s().tree.size[it.nodes[k]] || 0 }));
+    it.targets.forEach((tg, k) => targets.push({ ...tg, name: it.name, size: s().tree.size[it.nodes[k]] || 0 }));
   }
   await runDeletion(targets, cleanup.permanent);
 }
 
 async function runDeletion(targets, permanent) {
-  const total = targets.reduce((a, t) => a + (t.size || 0), 0);
-  openModal({ kind: 'busy', title: permanent ? 'Deleting…' : `Moving to ${TRASH}…`, done: 0, total: 1, current: '' });
+  const total = targets.reduce((a, tg) => a + (tg.size || 0), 0);
+  openModal({ kind: 'busy', title: permanent ? t('Deleting…') : t('Moving to {trash}…', { trash: trash() }), done: 0, total: 1, current: '' });
   let results;
   try {
     results = await api.remove({ targets, permanent });
   } catch (e) {
-    openModal({ kind: 'result', title: 'Cleanup failed', lines: [e.message], failures: [] });
+    openModal({ kind: 'result', title: t('Cleanup failed'), lines: [e.message], failures: [] });
     return;
   }
   const { tree } = s();
   let freed = 0;
   const failures = [];
   results.forEach((r, k) => {
-    const t = targets[k];
-    const i = tree.lookup(t.path);
-    if (r.protected) { failures.push({ path: t.path, error: r.error }); return; }
-    const before = i >= 0 ? tree.size[i] : t.size;
+    const tg = targets[k];
+    const i = tree.lookup(tg.path);
+    if (r.protected) { failures.push({ path: tg.path, error: r.error }); return; }
+    const before = i >= 0 ? tree.size[i] : tg.size;
     const remaining = r.ok ? 0 : Math.min(before, r.remaining);
     freed += Math.max(0, before - remaining);
-    if (!r.ok) failures.push({ path: t.path, error: r.error, remaining });
+    if (!r.ok) failures.push({ path: tg.path, error: r.error, remaining });
     if (i < 0) return;
-    if (t.contentsOnly) tree.remove(i, remaining, true);
+    if (tg.contentsOnly) tree.remove(i, remaining, true);
     else if (r.ok) tree.remove(i);
     else if (tree.isDir(i) && remaining < before) tree.remove(i, remaining, true);
   });
@@ -514,8 +517,9 @@ async function runDeletion(targets, permanent) {
   rebuildCleanup();
   refreshDrives();
   const ok = results.filter((r) => r.ok).length;
-  const where = permanent ? 'deleted permanently' : `moved to the ${TRASH}`;
-  const lines = [`${plural(ok, 'item')} ${where}.`];
-  if (failures.length) lines.push(`${plural(failures.length, 'item')} couldn't be fully removed — usually because a program is using them.`);
-  openModal({ kind: 'result', title: `Freed ${fmtBytes(freed)}`, lines, failures, freed, total });
+  const lines = [permanent
+    ? t('{n, plural, one {# item} other {# items}} deleted permanently.', { n: ok })
+    : t('{n, plural, one {# item} other {# items}} moved to the {trash}.', { n: ok, trash: trash() })];
+  if (failures.length) lines.push(t("{n, plural, one {# item} other {# items}} couldn't be fully removed — usually because a program is using them.", { n: failures.length }));
+  openModal({ kind: 'result', title: t('Freed {size}', { size: fmtBytes(freed) }), lines, failures, freed, total });
 }

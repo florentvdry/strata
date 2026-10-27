@@ -2,8 +2,9 @@
 import { useState, useEffect, useLayoutEffect } from 'preact/hooks';
 import { html } from '../lib/html.js';
 import { store, useStore, toast } from '../lib/store.js';
-import { fmtBytes, fmtWhen, plural, middleEllipsis } from '../lib/format.js';
-import { isWin, TRASH } from '../lib/platform.js';
+import { fmtBytes, fmtWhen, middleEllipsis } from '../lib/format.js';
+import { isWin, trash } from '../lib/platform.js';
+import { t, LANGUAGES } from '../lib/i18n.js';
 import { Notes } from '../lib/markdown.js';
 import { parseNotes } from '../lib/changelog.js';
 import * as A from '../actions.js';
@@ -50,47 +51,47 @@ function Dialog({ title, children, onClose, wide }) {
 }
 
 function AdminDialog({ m }) {
-  return html`<${Dialog} title="Fast scan needs administrator rights" onClose=${A.closeModal}>
-    <p>Reading the drive's file table directly is 10–20× faster on NTFS, but Windows only allows it for administrators. Strata can restart itself with admin rights and pick up this scan, or scan the normal way now.</p>
+  return html`<${Dialog} title=${t('Fast scan needs administrator rights')} onClose=${A.closeModal}>
+    <p>${t("Reading the drive's file table directly is 10–20× faster on NTFS, but Windows only allows it for administrators. Strata can restart itself with admin rights and pick up this scan, or scan the normal way now.")}</p>
     <div style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #C9CED6; padding: 10px 12px; border-radius: 8px; background: #0E1014; border: 1px solid #22262D">${m.root}</div>
     <div class="actions">
-      <button class="btn quiet" onClick=${A.closeModal}>Cancel</button>
-      <button class="btn" onClick=${() => A.requestScan(m.root, 'normal')}>Scan normally</button>
-      <button class="btn primary" onClick=${() => A.relaunchAsAdmin({ root: m.root, options: m.options })}>Restart as administrator</button>
+      <button class="btn quiet" onClick=${A.closeModal}>${t('Cancel')}</button>
+      <button class="btn" onClick=${() => A.requestScan(m.root, 'normal')}>${t('Scan normally')}</button>
+      <button class="btn primary" onClick=${() => A.relaunchAsAdmin({ root: m.root, options: m.options })}>${t('Restart as administrator')}</button>
     </div>
   <//>`;
 }
 
 function TrashDialog({ m }) {
-  return html`<${Dialog} title=${`Move to ${TRASH}?`} onClose=${A.closeModal}>
-    <p>${m.isDir ? `The folder and its ${plural(m.files, 'file')} will be moved to the ${TRASH}.` : `The file will be moved to the ${TRASH}.`} You can restore it from there or from Strata › History.</p>
+  return html`<${Dialog} title=${t('Move to {trash}?', { trash: trash() })} onClose=${A.closeModal}>
+    <p>${m.isDir ? t('The folder and its {n, plural, one {# file} other {# files}} will be moved to the {trash}.', { n: m.files, trash: trash() }) : t('The file will be moved to the {trash}.', { trash: trash() })} ${t('You can restore it from there or from Strata › History.')}</p>
     <div style="display: flex; flex-direction: column; gap: 4px; padding: 12px; border-radius: 10px; background: #0E1014; border: 1px solid #22262D">
       <span style="font-weight: 600; word-break: break-all">${m.name}</span>
       <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #9BA3AF; word-break: break-all">${m.path}</span>
       <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #C9CED6">${fmtBytes(m.size)}</span>
     </div>
     <div class="actions">
-      <button class="btn quiet" onClick=${A.closeModal}>Cancel</button>
-      <button class="btn danger" onClick=${() => A.trashNode(m.node)}>Move to ${TRASH}</button>
+      <button class="btn quiet" onClick=${A.closeModal}>${t('Cancel')}</button>
+      <button class="btn danger" onClick=${() => A.trashNode(m.node)}>${t('Move to {trash}', { trash: trash() })}</button>
     </div>
   <//>`;
 }
 
 function ConfirmCleanupDialog({ m }) {
   const shown = m.items.slice(0, 6);
-  return html`<${Dialog} title=${m.permanent ? `Delete ${plural(m.items.length, 'item')} permanently?` : `Move ${plural(m.items.length, 'item')} to the ${TRASH}?`} onClose=${A.closeModal}>
-    <p>${m.permanent ? html`This frees <b style="color:#E6E8EB">${fmtBytes(m.bytes)}</b> right away. <b style="color:#FF9AA2">It can't be undone.</b>` : html`This frees up to <b style="color:#E6E8EB">${fmtBytes(m.bytes)}</b> once you empty the ${TRASH}. Files in use are skipped.`}</p>
+  return html`<${Dialog} title=${m.permanent ? t('Delete {n, plural, one {# item} other {# items}} permanently?', { n: m.items.length }) : t('Move {n, plural, one {# item} other {# items}} to the {trash}?', { n: m.items.length, trash: trash() })} onClose=${A.closeModal}>
+    <p>${m.permanent ? html`${t('This frees {size} right away.', { size: fmtBytes(m.bytes) })} <b style="color:#FF9AA2">${t("It can't be undone.")}</b>` : t('This frees up to {size} once you empty the {trash}. Files in use are skipped.', { size: fmtBytes(m.bytes), trash: trash() })}</p>
     <div style="display: flex; flex-direction: column; border-radius: 10px; border: 1px solid #22262D; background: #0E1014">
       ${shown.map((it, k) => html`
         <div style=${`display: flex; gap: 12px; align-items: center; padding: 9px 12px; ${k < shown.length - 1 || m.items.length > 6 ? 'border-bottom: 1px solid #1B1F25' : ''}`}>
           <span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">${it.name}</span>
           <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #9BA3AF">${fmtBytes(it.v)}</span>
         </div>`)}
-      ${m.items.length > 6 && html`<div style="padding: 9px 12px; color: #9BA3AF; font-size: 13px">and ${plural(m.items.length - 6, 'more item')}</div>`}
+      ${m.items.length > 6 && html`<div style="padding: 9px 12px; color: #9BA3AF; font-size: 13px">${t('and {n, plural, one {# more item} other {# more items}}', { n: m.items.length - 6 })}</div>`}
     </div>
     <div class="actions">
-      <button class="btn quiet" onClick=${A.closeModal}>Cancel</button>
-      <button class=${m.permanent ? 'btn danger' : 'btn primary'} onClick=${() => A.runCleanup()}>${m.permanent ? 'Delete permanently' : `Move to ${TRASH}`}</button>
+      <button class="btn quiet" onClick=${A.closeModal}>${t('Cancel')}</button>
+      <button class=${m.permanent ? 'btn danger' : 'btn primary'} onClick=${() => A.runCleanup()}>${m.permanent ? t('Delete permanently') : t('Move to {trash}', { trash: trash() })}</button>
     </div>
   <//>`;
 }
@@ -99,7 +100,7 @@ function BusyDialog({ m }) {
   const pct = m.total ? Math.min(1, m.done / m.total) : 0;
   return html`<${Dialog} title=${m.title}>
     <span style="display: block; height: 8px; border-radius: 4px; background: #22262D; overflow: hidden"><span style=${`display: block; height: 100%; width: ${Math.max(4, pct * 100)}%; background: var(--accent); transition: width .2s`}></span></span>
-    <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #9BA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">${middleEllipsis(m.current || 'Starting…', 80)}</span>
+    <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #9BA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">${middleEllipsis(m.current || t('Starting…'), 80)}</span>
   <//>`;
 }
 
@@ -111,12 +112,12 @@ function ResultDialog({ m }) {
         ${m.failures.slice(0, 50).map((f) => html`
           <div style="display: flex; flex-direction: column; gap: 2px; padding: 9px 12px; border-bottom: 1px solid #1B1F25">
             <span style="font-family: 'Geist Mono', monospace; font-size: 12px; word-break: break-all">${f.path}</span>
-            <span style="font-size: 12px; color: #F5B54A">${f.error || 'Not removed'}${f.remaining > 0 ? ` · ${fmtBytes(f.remaining)} left` : ''}</span>
+            <span style="font-size: 12px; color: #F5B54A">${f.error || t('Not removed')}${f.remaining > 0 ? ` · ${t('{size} left', { size: fmtBytes(f.remaining) })}` : ''}</span>
           </div>`)}
       </div>`}
     <div class="actions">
-      <button class="btn" onClick=${() => A.openModal({ kind: 'history' })}>Open history</button>
-      <button class="btn primary" onClick=${A.closeModal}>Done</button>
+      <button class="btn" onClick=${() => A.openModal({ kind: 'history' })}>${t('Open history')}</button>
+      <button class="btn primary" onClick=${A.closeModal}>${t('Done')}</button>
     </div>
   <//>`;
 }
@@ -124,46 +125,54 @@ function ResultDialog({ m }) {
 function SettingsDialog() {
   const st = useStore();
   const { settings, info, recent } = st;
-  return html`<${Dialog} title="Settings" onClose=${A.closeModal}>
+  return html`<${Dialog} title=${t('Settings')} onClose=${A.closeModal}>
     <section style="display: flex; flex-direction: column; gap: 10px">
-      <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #8C94A0">Appearance</span>
+      <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #8C94A0">${t('Appearance')}</span>
       <div style="display: flex; align-items: center; gap: 12px">
-        <span style="flex: 1">Accent color</span>
-        <div role="group" aria-label="Accent color" style="display: flex; gap: 8px">
+        <span style="flex: 1">${t('Language')}</span>
+        <select value=${settings.language || 'auto'} onChange=${(e) => A.saveSettings({ language: e.currentTarget.value })} aria-label=${t('Language')}
+          style="height: 34px; padding: 0 10px; border-radius: 8px; border: 1px solid #333944; background: #0E1014; color: #E6E8EB; font: inherit">
+          <option value="auto">${t('Automatic (system language)')}</option>
+          ${LANGUAGES.map((l) => html`<option key=${l.code} value=${l.code}>${l.name}</option>`)}
+        </select>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px">
+        <span style="flex: 1">${t('Accent color')}</span>
+        <div role="group" aria-label=${t('Accent color')} style="display: flex; gap: 8px">
           ${ACCENTS.map((c) => html`<button type="button" aria-label=${c} aria-pressed=${settings.accent === c ? 'true' : 'false'} onClick=${() => A.saveSettings({ accent: c })}
             style=${`width: 28px; height: 28px; border-radius: 8px; cursor: pointer; background: ${c}; border: 2px solid ${settings.accent === c ? '#FFFFFF' : 'transparent'}; box-shadow: inset 0 0 0 1px rgba(0,0,0,.25)`}></button>`)}
         </div>
       </div>
       <label style="display: flex; align-items: center; gap: 12px; cursor: pointer">
-        <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span>Cushion shading</span><span style="font-size: 12px; color: #9BA3AF">Gives map blocks a raised look so nesting is easier to read</span></span>
+        <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span>${t('Cushion shading')}</span><span style="font-size: 12px; color: #9BA3AF">${t('Gives map blocks a raised look so nesting is easier to read')}</span></span>
         <input type="checkbox" checked=${settings.shading} onChange=${(e) => A.saveSettings({ shading: e.currentTarget.checked })} style="width: 18px; height: 18px; margin: 0" />
       </label>
     </section>
     ${isWin && html`<section style="display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid #22262D">
-      <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #8C94A0">Permissions</span>
+      <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #8C94A0">${t('Permissions')}</span>
       <div style="display: flex; align-items: center; gap: 12px">
         <span style="flex: 1; display: flex; flex-direction: column; gap: 2px">
-          <span>${info.admin ? 'Running as administrator' : 'Running without admin rights'}</span>
-          <span style="font-size: 12px; color: #9BA3AF">${info.admin ? 'Fast scan can read the file table directly.' : 'Fast scan and protected folders need administrator rights.'}</span>
+          <span>${info.admin ? t('Running as administrator') : t('Running without admin rights')}</span>
+          <span style="font-size: 12px; color: #9BA3AF">${info.admin ? t('Fast scan can read the file table directly.') : t('Fast scan and protected folders need administrator rights.')}</span>
         </span>
-        ${!info.admin && html`<button class="btn" onClick=${() => A.relaunchAsAdmin(null)}>Restart as admin</button>`}
+        ${!info.admin && html`<button class="btn" onClick=${() => A.relaunchAsAdmin(null)}>${t('Restart as admin')}</button>`}
       </div>
     </section>`}
     <${UpdatesSection} />
     <section style="display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid #22262D">
-      <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #8C94A0">Data</span>
+      <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #8C94A0">${t('Data')}</span>
       <div style="display: flex; align-items: center; gap: 12px">
-        <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span>Cleanup history</span><span style="font-size: 12px; color: #9BA3AF">Everything Strata removed in the last 7 days</span></span>
-        <button class="btn" onClick=${() => A.openModal({ kind: 'history' })}>Open history</button>
+        <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span>${t('Cleanup history')}</span><span style="font-size: 12px; color: #9BA3AF">${t('Everything Strata removed in the last 7 days')}</span></span>
+        <button class="btn" onClick=${() => A.openModal({ kind: 'history' })}>${t('Open history')}</button>
       </div>
       <div style="display: flex; align-items: center; gap: 12px">
-        <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span>Recent scans</span><span style="font-size: 12px; color: #9BA3AF">${plural(recent.length, 'saved scan')}</span></span>
-        <button class="btn" disabled=${!recent.length} onClick=${async () => { await api.clearRecent(); await A.refreshRecent(); toast('Recent scans cleared'); }}>Clear</button>
+        <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span>${t('Recent scans')}</span><span style="font-size: 12px; color: #9BA3AF">${t('{n, plural, one {# saved scan} other {# saved scans}}', { n: recent.length })}</span></span>
+        <button class="btn" disabled=${!recent.length} onClick=${async () => { await api.clearRecent(); await A.refreshRecent(); toast(t('Recent scans cleared')); }}>${t('Clear')}</button>
       </div>
     </section>
     <div class="actions" style="justify-content: space-between; align-items: center">
       <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #7B8390">Strata v${info.version}</span>
-      <button class="btn primary" onClick=${A.closeModal}>Done</button>
+      <button class="btn primary" onClick=${A.closeModal}>${t('Done')}</button>
     </div>
   <//>`;
 }
@@ -177,30 +186,30 @@ function HistoryDialog() {
     setBusy(h.id);
     try {
       const n = await api.restore(h.id);
-      toast(n ? `Restored ${h.name} — rescan to see it on the map` : 'Nothing to restore — the original location is taken.', 4000);
+      toast(n ? t('Restored {name} — rescan to see it on the map', { name: h.name }) : t('Nothing to restore — the original location is taken.'), 4000);
     } catch (e) { toast(e.message); }
     setBusy(null);
     load();
   }
-  return html`<${Dialog} title="History" onClose=${A.closeModal} wide>
-    <p>What Strata removed in the last 7 days. Items in the ${TRASH} can be put back where they were.</p>
+  return html`<${Dialog} title=${t('History')} onClose=${A.closeModal} wide>
+    <p>${t('What Strata removed in the last 7 days. Items in the {trash} can be put back where they were.', { trash: trash() })}</p>
     <div style="display: flex; flex-direction: column; max-height: 52vh; overflow: auto; border-radius: 10px; border: 1px solid #22262D; background: #0E1014">
-      ${list === null && html`<div style="padding: 16px; color: #9BA3AF; display: flex; gap: 10px; align-items: center"><span class="spinner"></span> Loading…</div>`}
-      ${list && !list.length && html`<div style="padding: 16px; color: #9BA3AF">Nothing removed yet.</div>`}
+      ${list === null && html`<div style="padding: 16px; color: #9BA3AF; display: flex; gap: 10px; align-items: center"><span class="spinner"></span> ${t('Loading…')}</div>`}
+      ${list && !list.length && html`<div style="padding: 16px; color: #9BA3AF">${t('Nothing removed yet.')}</div>`}
       ${list && list.map((h) => html`
         <div style="display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-bottom: 1px solid #1B1F25">
           <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
-            <span style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">${h.name}${h.contentsOnly ? ' (contents)' : ''}</span>
+            <span style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">${h.contentsOnly ? t('{name} (contents)', { name: h.name }) : h.name}</span>
             <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #9BA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">${h.path}</span>
-            <span style="font-size: 12px; color: #C9CED6">${fmtWhen(h.at)} · ${h.permanent ? 'Deleted permanently' : h.restored ? 'Restored' : TRASH}${h.ok ? '' : ' · partly'}</span>
+            <span style="font-size: 12px; color: #C9CED6">${fmtWhen(h.at)} · ${h.permanent ? t('Deleted permanently') : h.restored ? t('Restored') : trash()}${h.ok ? '' : ` · ${t('partly')}`}</span>
           </span>
           <span style="font-family: 'Geist Mono', monospace; font-size: 12px">${fmtBytes(h.size)}</span>
-          ${h.restorable ? html`<button class="btn" style="height: 32px; padding: 0 12px" disabled=${busy === h.id} onClick=${() => restore(h)}>${busy === h.id ? 'Restoring…' : 'Restore'}</button>` : html`<span style="width: 84px"></span>`}
+          ${h.restorable ? html`<button class="btn" style="height: 32px; padding: 0 12px" disabled=${busy === h.id} onClick=${() => restore(h)}>${busy === h.id ? t('Restoring…') : t('Restore')}</button>` : html`<span style="width: 84px"></span>`}
         </div>`)}
     </div>
     <div class="actions">
-      <button class="btn quiet" disabled=${!list || !list.length} onClick=${async () => { await api.clearHistory(); load(); }}>Clear history</button>
-      <button class="btn primary" onClick=${A.closeModal}>Done</button>
+      <button class="btn quiet" disabled=${!list || !list.length} onClick=${async () => { await api.clearHistory(); load(); }}>${t('Clear history')}</button>
+      <button class="btn primary" onClick=${A.closeModal}>${t('Done')}</button>
     </div>
   <//>`;
 }
@@ -210,15 +219,15 @@ const HINT = 'font-size: 12px; color: #9BA3AF';
 
 function updateStatus(u, version) {
   if (!u) return '';
-  if (!u.configured) return 'Updates aren\'t set up in this build.';
+  if (!u.configured) return t("Updates aren't set up in this build.");
   switch (u.phase) {
-    case 'checking': return 'Checking…';
-    case 'uptodate': return `Strata ${version} is up to date.`;
-    case 'available': return `Strata ${u.version} is available.`;
-    case 'downloading': return `Downloading Strata ${u.version}…`;
-    case 'ready': return `Strata ${u.version} is ready to install.`;
-    case 'installing': return 'Installing…';
-    case 'error': return u.error || 'Couldn\'t check for updates.';
+    case 'checking': return t('Checking…');
+    case 'uptodate': return t('Strata {version} is up to date.', { version });
+    case 'available': return t('Strata {version} is available.', { version: u.version });
+    case 'downloading': return t('Downloading Strata {version}…', { version: u.version });
+    case 'ready': return t('Strata {version} is ready to install.', { version: u.version });
+    case 'installing': return t('Installing…');
+    case 'error': return u.error || t("Couldn't check for updates.");
     default: return '';
   }
 }
@@ -229,75 +238,75 @@ function UpdatesSection() {
   const busy = u && ['checking', 'downloading', 'installing'].includes(u.phase);
   const pending = u && ['available', 'downloading', 'ready'].includes(u.phase);
   return html`<section style="display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid #22262D">
-    <span style=${LABEL}>Updates</span>
+    <span style=${LABEL}>${t('Updates')}</span>
     <label style="display: flex; align-items: center; gap: 12px; cursor: pointer">
-      <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span>Check for updates automatically</span><span style=${HINT}>Once a day, Strata asks github.com for the newest version. Nothing about you or your files is sent.</span></span>
+      <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span>${t('Check for updates automatically')}</span><span style=${HINT}>${t('Once a day, Strata asks github.com for the newest version. Nothing about you or your files is sent.')}</span></span>
       <input type="checkbox" checked=${opts.check === true} onChange=${(e) => A.setUpdateOptions({ check: e.currentTarget.checked })} style="width: 18px; height: 18px; margin: 0" />
     </label>
     <div style="display: flex; align-items: center; gap: 12px">
-      <span style="flex: 1">Update channel</span>
-      <select value=${opts.channel} onChange=${(e) => A.setUpdateOptions({ channel: e.currentTarget.value, skipped: '' })} aria-label="Update channel"
+      <span style="flex: 1">${t('Update channel')}</span>
+      <select value=${opts.channel} onChange=${(e) => A.setUpdateOptions({ channel: e.currentTarget.value, skipped: '' })} aria-label=${t('Update channel')}
         style="height: 34px; padding: 0 10px; border-radius: 8px; border: 1px solid #333944; background: #0E1014; color: #E6E8EB; font: inherit">
-        <option value="stable">Stable</option>
-        <option value="beta">Beta (early builds)</option>
+        <option value="stable">${t('Stable')}</option>
+        <option value="beta">${t('Beta (early builds)')}</option>
       </select>
     </div>
     <div style="display: flex; align-items: center; gap: 12px">
       <span style="flex: 1; display: flex; flex-direction: column; gap: 2px">
-        <span style=${u && u.phase === 'error' ? 'color: #F5B54A' : ''}>${updateStatus(u, info.version) || `Strata ${info.version}`}</span>
-        ${info.portable && html`<span style=${HINT}>Portable build: the update replaces this file in place.</span>`}
+        <span style=${u && u.phase === 'error' ? 'color: #F5B54A' : ''}>${updateStatus(u, info.version) || t('Strata {version}', { version: info.version })}</span>
+        ${info.portable && html`<span style=${HINT}>${t('Portable build: the update replaces this file in place.')}</span>`}
       </span>
-      ${pending ? html`<button class="btn" onClick=${() => A.openModal({ kind: 'update' })}>View</button>` : html`<button class="btn" disabled=${busy || !(u && u.configured)} onClick=${() => A.checkForUpdates(true)}>${busy ? 'Checking…' : 'Check now'}</button>`}
+      ${pending ? html`<button class="btn" onClick=${() => A.openModal({ kind: 'update' })}>${t('View')}</button>` : html`<button class="btn" disabled=${busy || !(u && u.configured)} onClick=${() => A.checkForUpdates(true)}>${busy ? t('Checking…') : t('Check now')}</button>`}
     </div>
     <div style="display: flex; align-items: center; gap: 12px">
-      <span style="flex: 1">Release notes</span>
-      <button class="btn" onClick=${() => A.openReleaseNotes(true)}>What's new</button>
+      <span style="flex: 1">${t('Release notes')}</span>
+      <button class="btn" onClick=${() => A.openReleaseNotes(true)}>${t("What's new")}</button>
     </div>
   </section>`;
 }
 
 function UpdatesAskDialog() {
-  return html`<${Dialog} title="Keep Strata up to date?" onClose=${() => A.answerUpdatesAsk(false)}>
-    <p>Strata can look for a newer version once a day and tell you when there is one. It only asks github.com for a small file with the latest version number; nothing about you or your files is sent, and nothing is installed without your say.</p>
-    <p>You can change this any time in Settings › Updates.</p>
+  return html`<${Dialog} title=${t('Keep Strata up to date?')} onClose=${() => A.answerUpdatesAsk(false)}>
+    <p>${t('Strata can look for a newer version once a day and tell you when there is one. It only asks github.com for a small file with the latest version number; nothing about you or your files is sent, and nothing is installed without your say.')}</p>
+    <p>${t('You can change this any time in Settings › Updates.')}</p>
     <div class="actions">
-      <button class="btn quiet" onClick=${() => A.answerUpdatesAsk(false)}>No thanks</button>
-      <button class="btn primary" onClick=${() => A.answerUpdatesAsk(true)}>Check automatically</button>
+      <button class="btn quiet" onClick=${() => A.answerUpdatesAsk(false)}>${t('No thanks')}</button>
+      <button class="btn primary" onClick=${() => A.answerUpdatesAsk(true)}>${t('Check automatically')}</button>
     </div>
   <//>`;
 }
 
-const MODE_HINT = {
-  installer: 'Strata will close, install the update and start again.',
-  portable: 'Strata will replace this file with the new version and start again. Your settings stay in "Strata Data" next to it.',
-  appimage: 'Strata will replace this AppImage with the new version and start again.',
-  package: 'Linux asks for your password to install the package. Strata starts again afterwards.',
-  manual: 'This copy of Strata is updated by hand: download the new version from the release page.',
-};
+const modeHint = (mode) => ({
+  installer: t('Strata will close, install the update and start again.'),
+  portable: t('Strata will replace this file with the new version and start again. Your settings stay in "Strata Data" next to it.'),
+  appimage: t('Strata will replace this AppImage with the new version and start again.'),
+  package: t('Linux asks for your password to install the package. Strata starts again afterwards.'),
+  manual: t('This copy of Strata is updated by hand: download the new version from the release page.'),
+})[mode] || '';
 
 function UpdateDialog() {
   const { update: u, info } = useStore();
-  if (!u || !u.version) return html`<${Dialog} title="No update" onClose=${A.closeModal}><p>${updateStatus(u, info.version)}</p><div class="actions"><button class="btn primary" onClick=${A.closeModal}>Done</button></div><//>`;
+  if (!u || !u.version) return html`<${Dialog} title=${t('No update')} onClose=${A.closeModal}><p>${updateStatus(u, info.version)}</p><div class="actions"><button class="btn primary" onClick=${A.closeModal}>${t('Done')}</button></div><//>`;
   const manual = u.mode === 'manual';
   const downloading = u.phase === 'downloading';
   const pct = u.total ? Math.min(1, u.downloaded / u.total) : 0;
   const entry = parseNotes(u.notes);
   const hasNotes = entry.summary || entry.sections.length;
   const page = `https://github.com/florentvdry/strata/releases/tag/v${u.version}`;
-  return html`<${Dialog} title=${u.phase === 'ready' ? 'Ready to install' : `Strata ${u.version} is available`} onClose=${downloading ? null : A.closeModal} wide>
-    <p>You have <b style="color: #E6E8EB">${info.version}</b>. ${MODE_HINT[u.mode] || ''}</p>
+  return html`<${Dialog} title=${u.phase === 'ready' ? t('Ready to install') : t('Strata {version} is available', { version: u.version })} onClose=${downloading ? null : A.closeModal} wide>
+    <p>${t('You have {version}.', { version: info.version })} ${modeHint(u.mode)}</p>
     ${hasNotes && html`<div style="max-height: 40vh; overflow: auto; padding: 14px; border-radius: 10px; border: 1px solid #22262D; background: #0E1014"><${Notes} entry=${entry} /></div>`}
     ${downloading && html`
       <span style="display: block; height: 8px; border-radius: 4px; background: #22262D; overflow: hidden"><span style=${`display: block; height: 100%; width: ${Math.max(4, pct * 100)}%; background: var(--accent); transition: width .2s`}></span></span>
-      <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #9BA3AF">${fmtBytes(u.downloaded)}${u.total ? ` of ${fmtBytes(u.total)}` : ''}</span>`}
+      <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #9BA3AF">${fmtBytes(u.downloaded)}${u.total ? ` ${t('of {size}', { size: fmtBytes(u.total) })}` : ''}</span>`}
     ${u.error && html`<p style="color: #F5B54A">${u.error}</p>`}
     <div class="actions">
-      ${u.phase === 'available' && html`<button class="btn quiet" onClick=${A.skipUpdate}>Skip this version</button>`}
-      <button class="btn quiet" onClick=${A.closeModal}>${downloading ? 'Hide' : 'Later'}</button>
-      ${manual && html`<button class="btn primary" onClick=${() => api.openUrl(page)}>Open download page</button>`}
-      ${!manual && u.phase === 'available' && html`<button class="btn primary" onClick=${A.downloadUpdate}>Download update</button>`}
-      ${!manual && u.phase === 'ready' && html`<button class="btn primary" onClick=${A.installUpdate}>Install and restart</button>`}
-      ${u.phase === 'installing' && html`<span style="display: inline-flex; align-items: center; gap: 10px; color: #9BA3AF"><span class="spinner"></span> Installing…</span>`}
+      ${u.phase === 'available' && html`<button class="btn quiet" onClick=${A.skipUpdate}>${t('Skip this version')}</button>`}
+      <button class="btn quiet" onClick=${A.closeModal}>${downloading ? t('Hide') : t('Later')}</button>
+      ${manual && html`<button class="btn primary" onClick=${() => api.openUrl(page)}>${t('Open download page')}</button>`}
+      ${!manual && u.phase === 'available' && html`<button class="btn primary" onClick=${A.downloadUpdate}>${t('Download update')}</button>`}
+      ${!manual && u.phase === 'ready' && html`<button class="btn primary" onClick=${A.installUpdate}>${t('Install and restart')}</button>`}
+      ${u.phase === 'installing' && html`<span style="display: inline-flex; align-items: center; gap: 10px; color: #9BA3AF"><span class="spinner"></span> ${t('Installing…')}</span>`}
     </div>
   <//>`;
 }
@@ -309,14 +318,14 @@ function WhatsNewDialog({ m }) {
         <div key=${e.version} style="display: flex; flex-direction: column; gap: 12px">
           <div style="display: flex; align-items: baseline; gap: 10px">
             <span style="font-size: 16px; font-weight: 600">${e.version}</span>
-            ${e.prerelease && html`<span style="font-size: 11px; padding: 1px 7px; border-radius: 6px; border: 1px solid #333944; color: #F5B54A">beta</span>`}
+            ${e.prerelease && html`<span style="font-size: 11px; padding: 1px 7px; border-radius: 6px; border: 1px solid #333944; color: #F5B54A">${t('beta')}</span>`}
             <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #7B8390">${e.date}</span>
           </div>
           <${Notes} entry=${e} />
         </div>`)}
-      ${!m.entries.length && html`<p>Nothing new to show.</p>`}
+      ${!m.entries.length && html`<p>${t('Nothing new to show.')}</p>`}
     </div>
-    <div class="actions"><button class="btn primary" onClick=${A.closeModal}>Done</button></div>
+    <div class="actions"><button class="btn primary" onClick=${A.closeModal}>${t('Done')}</button></div>
   <//>`;
 }
 
@@ -358,5 +367,5 @@ export function Modals() {
     ${D && html`<${D} m=${modal} />`}
     <${ContextMenu} />
     ${t && html`<div class="toast" role="status">${t}</div>`}
-    ${dragging && html`<div class="dropzone">${Icon.folderPlus()}<span>Drop a folder to map it</span></div>`}`;
+    ${dragging && html`<div class="dropzone">${Icon.folderPlus()}<span>${t('Drop a folder to map it')}</span></div>`}`;
 }

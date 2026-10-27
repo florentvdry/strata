@@ -1,5 +1,6 @@
 // The little Markdown the release notes use, drawn as Preact nodes (never as HTML strings).
 import { html } from './html.js';
+import { t } from './i18n.js';
 
 const TOKEN = /(\*\*[^*]+\*\*|\*[^*\s][^*]*\*|`[^`]+`|\[[^\]]+\]\([^)\s]+\))/;
 
@@ -20,6 +21,13 @@ export function inline(text) {
   });
 }
 
+// Keep a literal t() per heading so the translation catalogs pick them up.
+const SECTION_TITLE = {
+  Added: () => t('Added'), Changed: () => t('Changed'), Deprecated: () => t('Deprecated'),
+  Removed: () => t('Removed'), Fixed: () => t('Fixed'), Security: () => t('Security'),
+};
+const sectionTitle = (title) => (SECTION_TITLE[title] ? SECTION_TITLE[title]() : title);
+
 const HEAD = 'font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #8C94A0';
 
 /** One version's notes: a summary, then Added / Changed / Fixed… with their bullets. */
@@ -29,7 +37,7 @@ export function Notes({ entry }) {
       ${entry.summary && html`<p style="margin: 0; color: #C9CED6; line-height: 1.5">${inline(entry.summary)}</p>`}
       ${entry.sections.map((s) => html`
         <section key=${s.title} style="display: flex; flex-direction: column; gap: 8px">
-          <span style=${HEAD}>${s.title}</span>
+          <span style=${HEAD}>${sectionTitle(s.title)}</span>
           <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; color: #C9CED6; line-height: 1.5">
             ${s.items.map((it, k) => html`
               <li key=${k}>${inline(it.text)}

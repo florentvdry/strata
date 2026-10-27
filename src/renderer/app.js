@@ -8,6 +8,7 @@ import { Start } from './views/start.js';
 import { Scanning } from './views/scanning.js';
 import { Explorer } from './views/explorer.js';
 import { Cleanup } from './views/cleanup.js';
+import { t } from './lib/i18n.js';
 import * as A from './actions.js';
 
 const api = window.strata;
@@ -60,9 +61,9 @@ function App() {
   useGlobalKeys();
   useDrop();
   useEffect(() => {
-    const titles = { start: 'Strata', scanning: 'Strata — Scanning', explorer: 'Strata — Explorer', cleanup: 'Strata — Review cleanup' };
+    const titles = { start: 'Strata', scanning: t('Strata — Scanning'), explorer: t('Strata — Explorer'), cleanup: t('Strata — Review cleanup') };
     document.title = titles[s.screen] || 'Strata';
-  }, [s.screen]);
+  }, [s.screen, s.locale]);
   if (!s.ready) return html`<div style="min-height: 100vh; background: #0E1014"></div>`;
   let screen = s.screen;
   if ((screen === 'explorer' || screen === 'cleanup') && !s.tree) screen = 'start';
@@ -74,5 +75,5 @@ function App() {
 render(html`<${App} />`, document.getElementById('app'));
 A.init().catch((e) => {
   console.error(e);
-  store.set({ ready: true, toast: `Startup problem: ${e.message}` });
+  store.set({ ready: true, toast: t('Startup problem: {error}', { error: e.message }) });
 });

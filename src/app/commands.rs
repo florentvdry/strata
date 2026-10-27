@@ -500,9 +500,9 @@ pub async fn clipboard_write(app: AppHandle, text: String) -> Res<()> {
 }
 
 #[tauri::command]
-pub async fn dialog_folder(app: AppHandle) -> Res<Option<String>> {
+pub async fn dialog_folder(app: AppHandle, title: String) -> Res<Option<String>> {
     blocking(move || {
-        let picked = app.dialog().file().set_title("Choose a folder to map").blocking_pick_folder();
+        let picked = app.dialog().file().set_title(title).blocking_pick_folder();
         Ok(picked.and_then(|p| p.into_path().ok()).map(|p| p.to_string_lossy().into_owned()))
     })
     .await

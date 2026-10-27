@@ -21,6 +21,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- **Strata speaks 16 languages**: English, Chinese (Simplified), Hindi, Spanish, Arabic, French, Portuguese, Russian, German, Japanese, Korean, Italian, Turkish, Dutch, Polish and Indonesian. It follows your system language; change it in Settings › Language. Dates and numbers follow the language too.
 - **Updates, only when you want them.** Settings › Updates checks github.com once a day if you allow it (Strata asks the first time), or when you press *Check now*. Nothing about you or your files is sent, and nothing installs without your say.
   - Updates are verified with a signature before they are installed. Choose the Stable or Beta channel.
   - Works for the Windows installer, the **Windows portable `.exe`** (replaced in place), the Linux AppImage and the `.deb` / `.rpm` packages (Linux asks for your password). Other builds are told when a new version exists and open the download page.
