@@ -17,12 +17,13 @@ flowchart LR
 
 ## One-time setup: update signing
 
-The app only installs updates signed with your key; the public half is in `src-tauri/tauri.conf.json`.
+The app only installs updates signed with your key. The public half is already in `src-tauri/tauri.conf.json`; the private half must be stored as the **repository secret `TAURI_SIGNING_PRIVATE_KEY`** (Settings › Secrets and variables › Actions › *New repository secret*; paste the whole content of the key file). Also keep a copy in a password manager.
 
-1. `npm run signing:setup` makes the key pair, writes the public key into `tauri.conf.json` (commit it) and prints the private key **once**.
-2. Store the private key as the repository secret **`TAURI_SIGNING_PRIVATE_KEY`** (Settings › Secrets and variables › Actions) and keep a copy in a password manager. Add `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` too if you made the key with a password.
+A repository secret is enough here: the Release workflow reads it as it is. An *environment* secret would add protection (it can be limited to the `v*` tags and need an approval), but then the jobs that build with it must declare `environment: release`, which this setup doesn't do; if you want that, add it to the `check` job in `release.yml` and to the build jobs in `build.yml`.
 
-Don't lose the key and don't replace the public key later: every installed Strata only trusts the key it was built with, so a new key means everyone has to reinstall by hand. Until the public key is filled in, builds work but the updater reports "Updates aren't set up in this build", and the Release workflow refuses to run.
+Don't lose the key and don't replace the public key later: every installed Strata only trusts the key it was built with, so a new key means everyone has to reinstall by hand. If it ever has to be replaced, `npm run signing:setup -- --force` makes a new pair and prints the private key once.
+
+The Release workflow refuses to run while the public key is a placeholder or the secret is missing.
 
 ## Writing the notes
 
@@ -64,14 +65,14 @@ If a step fails, fix it and run the workflow again for the same tag (*Re-run all
 Debug builds are updated by hand, but a test can force a mode and a local manifest (debug builds only):
 
 ```bash
-npm run tauri -- signer generate --ci -w /tmp/test.key           # a throwaway key
+npm run tauri -- signer generate --ci -w /tmp/test.key           # a throwaway key (not the real one)
 PUB=$(cat /tmp/test.key.pub)
 (cd src-tauri && TAURI_CONFIG="{\"plugins\":{\"updater\":{\"pubkey\":\"$PUB\"}}}" cargo build)
-# serve a manifest with the entry "windows-x86_64-portable" (url + signature from `tauri signer sign -f /tmp/test.key payload`)
+# serve a manifest with the entry "windows-x86_64-portable" (url ending in .exe + signature from `tauri signer sign -f /tmp/test.key payload.exe`)
 STRATA_UPDATE_MODE=portable STRATA_UPDATE_ENDPOINT=http://127.0.0.1:8123/latest.json ./src-tauri/target/debug/strata
 ```
 
-`STRATA_UPDATE_MODE` is `portable` or `appimage`. In portable mode the running program file is swapped for the downloaded one, so test on a copy of the binary.
+`STRATA_UPDATE_MODE` is `portable` or `appimage` (with `APPIMAGE` set to a copy of the binary; the manifest entry is then `linux-x86_64` and the file must end in `.AppImage` and be an ELF). In both modes the running file is swapped for the downloaded one, so test on a copy of the binary. A manifest file that doesn't end the way the build expects (`.exe` for Windows, `.AppImage`, `.deb` / `.rpm`) makes the app fall back to *Open download page*.
 
 ## How the manifest picks a file
 

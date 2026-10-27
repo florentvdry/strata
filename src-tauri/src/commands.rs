@@ -1,4 +1,4 @@
-//! The app's commands: what `main.js` did in the Electron version, one command per `window.strata` call.
+//! The app's commands, one per `window.strata` call (see src/renderer/bridge.js).
 use base64::Engine;
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -706,7 +706,7 @@ fn data_dir(app: &tauri::App, portable: bool) -> PathBuf {
     if portable && let Some(dir) = std::env::current_exe().ok().and_then(|e| e.parent().map(Path::to_path_buf)) {
         return dir.join("Strata Data");
     }
-    // Same folder the Electron versions used, so settings, history and saved scans carry over.
+    // %APPDATA%\Strata on Windows, ~/.config/Strata on Linux.
     app.path().config_dir().unwrap_or_else(|_| std::env::temp_dir()).join("Strata")
 }
 

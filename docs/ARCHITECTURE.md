@@ -152,7 +152,7 @@ A [Tauri](https://tauri.app) app: the UI runs in the web view the system already
 - **Window and security:** one window, created in `setup` so the portable build can keep the web view's files next to the `.exe`. The Content-Security-Policy is in `tauri.conf.json`; navigation away from the app is refused. The UI has no file system or shell access of its own: only the app's commands, which check what they are asked.
 - **The scanner is inside the app** (`scanner.rs`). `build.rs` embeds `bin/strata-scan(.exe)`; on first run (and after each update) it is unpacked to `<data>/bin/`, so a portable build stays one file. `scanner::run` starts it, reads its JSON lines and forwards them to the UI as events.
 - Starts the scanner for scans, duplicates and deletions, and mirrors scan progress on the taskbar button.
-- Keeps settings, recent scans and the 7-day history as small JSON files (`store.rs`). Writes go to a temporary file first, then get renamed. The data folder is the one the Electron versions used, so nothing is lost when upgrading.
+- Keeps settings, recent scans and the 7-day history as small JSON files (`store.rs`). Writes go to a temporary file first, then get renamed.
 - **Deletion:** targets are expanded (a "contents only" target, such as a temp folder, becomes its children), protected paths are refused (`platform.rs`, plus the drives and Trash folders from the scanner's `info`), and the scanner does the work.
 - **Restore:** asks the scanner which Recycle Bin / Trash items match a history entry (`trash-list`), then has it put them back (`restore`).
 - **Restart as administrator:** relaunches through `Start-Process -Verb RunAs` and passes the pending scan along. Windows only: Linux has no file-table fast scan, and GUI apps shouldn't run as root.

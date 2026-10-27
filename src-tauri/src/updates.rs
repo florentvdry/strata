@@ -21,6 +21,8 @@ use crate::store;
 
 const REPO: &str = "https://github.com/florentvdry/strata";
 const CHECK_EVERY_MS: i64 = 24 * 3600 * 1000;
+/// Passed to the program an update starts, so it can wait for the old one to quit.
+const UPDATED_FLAG: &str = "--strata-updated";
 
 #[derive(Clone, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -349,7 +351,8 @@ pub async fn update_install(app: AppHandle, st: State<'_, Arc<AppState>>) -> Res
 }
 
 fn relaunch(app: &AppHandle, exe: &Path) -> ! {
-    let _ = std::process::Command::new(exe).spawn();
+    // The flag tells the new process to wait until this one has really gone (see `cleanup_old_executable`).
+    let _ = std::process::Command::new(exe).arg(UPDATED_FLAG).spawn();
     app.exit(0);
     std::process::exit(0)
 }
@@ -382,7 +385,9 @@ pub fn swap_executable(exe: &Path, bytes: &[u8]) -> std::io::Result<PathBuf> {
     Ok(old)
 }
 
-/// Removes the previous program file left by `swap_executable`. The old process may still be quitting, so it retries.
+/// Removes the previous program file left by `swap_executable`. On Windows a running .exe can't be deleted, so the
+/// file only goes once the old process has quit: a program started by an update (`--strata-updated`) waits for that
+/// before it opens its window, so the two never share the web view's files. Other starts clean up in the background.
 pub fn cleanup_old_executable() {
     let Ok(exe) = std::env::current_exe() else { return };
     let Some(name) = exe.file_name().map(|n| n.to_string_lossy().into_owned()) else { return };
@@ -390,14 +395,19 @@ pub fn cleanup_old_executable() {
     if !old.exists() {
         return;
     }
-    std::thread::spawn(move || {
-        for _ in 0..20 {
+    let remove = move || {
+        for _ in 0..30 {
             if std::fs::remove_file(&old).is_ok() || !old.exists() {
                 return;
             }
             std::thread::sleep(Duration::from_millis(500));
         }
-    });
+    };
+    if std::env::args().any(|a| a == UPDATED_FLAG) {
+        remove();
+    } else {
+        std::thread::spawn(remove);
+    }
 }
 
 #[cfg(test)]

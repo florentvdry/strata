@@ -7,7 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
-- **Strata now runs on Tauri instead of Electron.** It uses the web view already on your system (WebView2 on Windows, WebKitGTK on Linux), so the downloads are a few megabytes instead of a bundled browser (the Linux AppImage, which carries its own web view, is about 80 MB), and it starts faster and uses less memory. The look and every feature are the same, and your settings, history and saved scans carry over.
+- **Strata now runs on Tauri instead of Electron.** It uses the web view already on your system (WebView2 on Windows, WebKitGTK on Linux), so the downloads are a few megabytes instead of a bundled browser (the Linux AppImage, which carries its own web view, is about 80 MB), and it starts faster and uses less memory. The look and every feature are the same.
   - **Windows:** needs the WebView2 runtime. It is already part of Windows 11 and of up-to-date Windows 10; the installer adds it if it is missing. The portable build is still a single `.exe`, and keeps everything (including the web view's files) in a `Strata Data` folder next to it.
   - **Linux:** the `.deb`, `.rpm` and `.pacman` packages depend on `webkit2gtk-4.1` and `gtk3` (Ubuntu 22.04+, Debian 12+, Fedora, Arch). The AppImage and `.tar.gz` no longer need `--no-sandbox` on Ubuntu 24.04.
   - Right-click menus are drawn by Strata itself, and dropped folders are read natively.
