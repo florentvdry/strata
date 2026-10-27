@@ -65,7 +65,7 @@ pub fn parse_info(b: &[u8]) -> Option<(String, f64)> {
     let i64_at = |o: usize| b.get(o..o + 8).map(|s| i64::from_le_bytes(s.try_into().unwrap()));
     let version = i64_at(0)?;
     let deleted = unix_from_filetime(i64_at(16)?) * 1000.0;
-    let units = |bytes: &[u8]| bytes.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect::<Vec<u16>>();
+    let units = |bytes: &[u8]| bytes.as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes(*c)).collect::<Vec<u16>>();
     let original = if version == 2 {
         let len = i32::from_le_bytes(b.get(24..28)?.try_into().ok()?) as usize;
         let chars = units(b.get(28..28 + len.saturating_sub(1) * 2)?);

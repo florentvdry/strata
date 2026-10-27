@@ -166,10 +166,10 @@ pub fn read(bytes: &[u8]) -> io::Result<(Header, Nodes)> {
         *off += len;
         Ok(s)
     };
-    let f64s = |b: &[u8]| b.chunks_exact(8).map(|c| f64::from_le_bytes(c.try_into().unwrap())).collect::<Vec<_>>();
+    let f64s = |b: &[u8]| b.as_chunks::<8>().0.iter().map(|c| f64::from_le_bytes(*c)).collect::<Vec<_>>();
     let size = f64s(take(&mut off, 8 * n)?);
     let mtime = f64s(take(&mut off, 8 * n)?);
-    let parent = take(&mut off, 4 * n)?.chunks_exact(4).map(|c| i32::from_le_bytes(c.try_into().unwrap())).collect();
+    let parent = take(&mut off, 4 * n)?.as_chunks::<4>().0.iter().map(|c| i32::from_le_bytes(*c)).collect();
     let flags = take(&mut off, n)?.to_vec();
     let kind = take(&mut off, n)?.to_vec();
     let nlen = i32_at(off)? as usize;

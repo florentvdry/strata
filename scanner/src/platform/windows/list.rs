@@ -38,41 +38,47 @@ impl WinLister {
         if depth > 64 {
             return false;
         }
-        let full = join(parent, name);
-        let w = wide(long_path(&full));
-        let h = unsafe {
-            CreateFileW(
-                w.as_ptr(),
-                0,
-                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                std::ptr::null(),
-                OPEN_EXISTING,
-                FILE_FLAG_BACKUP_SEMANTICS,
-                std::ptr::null_mut(),
-            )
-        };
-        if h == INVALID_HANDLE_VALUE {
-            return false;
-        }
-        let mut buf = vec![0u16; 1024];
-        let len = unsafe { GetFinalPathNameByHandleW(h, buf.as_mut_ptr(), 1024, 0) };
-        unsafe { CloseHandle(h) };
-        if len == 0 || len >= 1024 {
-            return false;
-        }
-        let mut target = from_wide(&buf[..len as usize]).to_string_lossy().into_owned();
-        if let Some(unc) = target.strip_prefix(r"\\?\UNC\") {
-            target = format!(r"\\{unc}");
-        } else if let Some(local) = target.strip_prefix(r"\\?\") {
-            target = local.to_owned();
-        }
-        let target = target.trim_end_matches('\\').to_lowercase();
-        let p = format!("{}\\", parent.trim_end_matches('\\')).to_lowercase();
-        if p.starts_with(&format!("{target}\\")) {
+        let Some(target) = final_path(&join(parent, name)) else { return false };
+        // The parent's final path too: the scanned path may use 8.3 short names (C:\Users\RUNNER~1) or go through
+        // another link, while final paths never do.
+        let parent = final_path(parent).unwrap_or_else(|| parent.trim_end_matches('\\').to_lowercase());
+        if format!("{parent}\\").starts_with(&format!("{target}\\")) {
             return false;
         }
         lock(&self.link_targets).insert(target)
     }
+}
+
+/// Where a path really leads (links resolved, long names), lowercase, without "\\?\" or a trailing backslash.
+fn final_path(p: &str) -> Option<String> {
+    let w = wide(long_path(p));
+    let h = unsafe {
+        CreateFileW(
+            w.as_ptr(),
+            0,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            std::ptr::null(),
+            OPEN_EXISTING,
+            FILE_FLAG_BACKUP_SEMANTICS,
+            std::ptr::null_mut(),
+        )
+    };
+    if h == INVALID_HANDLE_VALUE {
+        return None;
+    }
+    let mut buf = vec![0u16; 1024];
+    let len = unsafe { GetFinalPathNameByHandleW(h, buf.as_mut_ptr(), 1024, 0) };
+    unsafe { CloseHandle(h) };
+    if len == 0 || len >= 1024 {
+        return None;
+    }
+    let mut path = from_wide(&buf[..len as usize]).to_string_lossy().into_owned();
+    if let Some(unc) = path.strip_prefix(r"\\?\UNC\") {
+        path = format!(r"\\{unc}");
+    } else if let Some(local) = path.strip_prefix(r"\\?\") {
+        path = local.to_owned();
+    }
+    Some(path.trim_end_matches('\\').to_lowercase())
 }
 
 fn join(dir: &str, name: &str) -> String {

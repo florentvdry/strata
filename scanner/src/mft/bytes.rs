@@ -27,6 +27,6 @@ pub fn file_ref(b: &[u8], o: usize) -> Option<u64> {
 
 pub fn utf16_at(b: &[u8], o: usize, chars: usize) -> Option<String> {
     let s = b.get(o..o.checked_add(chars * 2)?)?;
-    let units: Vec<u16> = s.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
+    let units: Vec<u16> = s.as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes(*c)).collect();
     Some(String::from_utf16_lossy(&units))
 }
