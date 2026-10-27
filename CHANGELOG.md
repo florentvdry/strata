@@ -39,6 +39,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Internal
 
+- Faster CI: pull requests build a debug binary without installers (the smoke test still runs), a new push cancels the previous run, docs-only changes skip the build, and fuzzing runs only when `scanner/` changes (and weekly) in its own workflow.
 - `CHANGELOG.md` is the single source of release notes: `npm run release -- <version>` moves Unreleased under the new version and bumps every version number; the notes feed the GitHub release, the update manifest, the app's *What's new* and the website. CI checks the format. See [docs/RELEASING.md](docs/RELEASING.md).
 - A release workflow (tag `v*`) builds, signs and publishes Windows and Linux files and the update manifests (`latest.json`, plus a `channel-beta` manifest for the Beta channel). Pre-releases have no `.rpm` (RPM versions can't contain `-`); Fedora users take the AppImage until the final release.
 - Preact and htm are vendored in `src/renderer/vendor/` (`npm run vendor` refreshes them); the Content-Security-Policy now lives in `tauri.conf.json`.
