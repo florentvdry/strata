@@ -8,6 +8,7 @@ import { TYPES, SHADE } from '../lib/types.js';
 import { parseQuery, runSearch } from '../lib/search.js';
 import { CATS, selectionStats } from '../lib/cleanup.js';
 import { bytesParts, fmtBytes, fmtPair, fmtPct, fmtShort, fmtWhen, fmtDur, plural } from '../lib/format.js';
+import { isWin, trimSep, TRASH, FILE_MANAGER } from '../lib/platform.js';
 import { driveName } from './start.js';
 import * as A from '../actions.js';
 
@@ -121,8 +122,9 @@ function Row({ tree, r, sel, accent, maxV, total, flat }) {
 
 function Breadcrumb({ tree, zoom }) {
   const anc = tree.ancestors(zoom);
-  const rootName = tree.names[0].replace(/\\$/, '');
-  const label = (i) => (i === 0 ? (/^[A-Za-z]:$/.test(rootName) ? rootName : rootName.split('\\').pop()) : tree.name(i));
+  const rootName = isWin ? tree.names[0].replace(/\\$/, '') : trimSep(tree.names[0]);
+  const rootLabel = isWin ? (/^[A-Za-z]:$/.test(rootName) ? rootName : rootName.split('\\').pop()) : (rootName === '/' ? '/' : rootName.split('/').pop());
+  const label = (i) => (i === 0 ? rootLabel : tree.name(i));
   let crumbs = anc.map((i) => ({ i, l: label(i) }));
   if (crumbs.length > 6) crumbs = [crumbs[0], { i: -1, l: '…' }, ...crumbs.slice(-4)];
   return html`
@@ -231,8 +233,8 @@ function Details({ tree, node, ex, settings, cleanup, drive, queue }) {
       </dl>
       <div style="display: flex; flex-direction: column; gap: 8px">
         <button type="button" class="hov-accent" disabled=${node === 0} onClick=${() => A.toggleCleanupNode(node)} style=${`height: 44px; border-radius: 10px; border: ${queued ? '1px solid var(--accent)' : '0'}; background: ${queued ? 'transparent' : 'var(--accent)'}; color: ${queued ? 'var(--accent)' : '#0E1014'}; font-weight: 600; cursor: pointer`}>${queued ? 'Remove from cleanup' : 'Add to cleanup'}</button>
-        <button type="button" class="hov-ghost" onClick=${() => A.reveal(tree.path(node))} style="height: 44px; border-radius: 10px; border: 1px solid #333944; background: transparent; color: #E6E8EB; font-weight: 500; cursor: pointer">Show in Explorer</button>
-        <button type="button" class="hov-danger" disabled=${node === 0} onClick=${() => A.confirmTrash(node)} style="height: 44px; border-radius: 10px; border: 1px solid #5A2A2E; background: transparent; color: #FF9AA2; font-weight: 500; cursor: pointer">Move to Recycle Bin</button>
+        <button type="button" class="hov-ghost" onClick=${() => A.reveal(tree.path(node))} style="height: 44px; border-radius: 10px; border: 1px solid #333944; background: transparent; color: #E6E8EB; font-weight: 500; cursor: pointer">Show in ${FILE_MANAGER}</button>
+        <button type="button" class="hov-danger" disabled=${node === 0} onClick=${() => A.confirmTrash(node)} style="height: 44px; border-radius: 10px; border: 1px solid #5A2A2E; background: transparent; color: #FF9AA2; font-weight: 500; cursor: pointer">Move to ${TRASH}</button>
       </div>
       <div style="display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 12px; background: #14171C; border: 1px solid #22262D">
         <div style="display: flex; justify-content: space-between; align-items: baseline"><span style="font-weight: 600">Cleanup queue</span><span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: var(--accent)">${fmtBytes(queue.bytes)}</span></div>
@@ -256,7 +258,7 @@ export function Explorer() {
   const tableRef = useRef(null);
 
   const drive = A.driveOf(tree.names[0]);
-  const isDriveScan = /^[A-Za-z]:\\?$/.test(tree.names[0]);
+  const isDriveScan = isWin ? /^[A-Za-z]:\\?$/.test(tree.names[0]) : !!drive && drive.root === trimSep(tree.names[0]);
   const queue = useMemo(() => selectionStats(tree, cleanup.items, cleanup.on), [tree, v, cleanup]);
 
   // Smart view data (whole scan).

@@ -1,6 +1,8 @@
 # Architecture
 
-Strata has three parts: a small native **scanner** process that touches the disk, the Electron **main process** that orchestrates it, and the **UI** that turns a scan into maps and cleanup suggestions.
+Strata has three parts: a small **scanner** process that touches the disk, the Electron **main process** that orchestrates it, and the **UI** that turns a scan into maps and cleanup suggestions.
+
+The scanner is one Rust program, `strata-scan`, built for Windows and Linux from [`scanner/`](../scanner). What differs between the two systems (listing folders, drives, the NTFS fast scan, Recycle Bin vs. Trash) lives in two small platform modules behind one interface; everything else is shared. The main process and the UI only differ in small platform details: the path separator, case-sensitivity, drive names and wording.
 
 ```mermaid
 flowchart LR
@@ -19,11 +21,11 @@ flowchart LR
   subgraph Main["Main process"]
     IPC["IPC handlers<br/>scans · files · settings · history"]
   end
-  subgraph Scanner["StrataScan.exe"]
+  subgraph Scanner["strata-scan (Rust)"]
     W["Folder walk"]
-    MFT["NTFS MFT reader"]
+    MFT["NTFS MFT reader<br/>(Windows)"]
     D["Duplicate finder"]
-    X["Recycle / delete"]
+    X["Recycle Bin / Trash<br/>delete · restore"]
   end
   Disk[("Disk")]
   V <--> P <--> IPC
@@ -32,16 +34,48 @@ flowchart LR
   IPC -- "scan file (.strata)" --> T
 ```
 
-## Scanner (`scanner/StrataScan.cs`)
+## Scanner (`scanner/`)
 
-A console program written in C# 5 so the .NET Framework compiler built into Windows can build it. It has four commands:
+A Rust console program, `strata-scan`. Release builds are static: `x86_64-pc-windows-msvc` with the C runtime linked in (no Visual C++ redistributable), and `x86_64-unknown-linux-musl` on Linux (one binary for every distribution, with mimalloc since musl's allocator serializes threads).
+
+```mermaid
+flowchart TB
+  subgraph Core["Shared"]
+    CLI["main.rs / lib.rs<br/>commands, exit codes"]
+    PR["protocol.rs<br/>JSON lines, stdin"]
+    SC["scan/<br/>state, ticker, walker"]
+    SF["strata_file.rs<br/>scan file"]
+    TY["types.rs<br/>file types"]
+    DU["dupes.rs"]
+    DE["delete.rs<br/>delete · trash-list · restore"]
+  end
+  subgraph Win["platform/windows"]
+    WL["FindFirstFileExW<br/>junctions"]
+    WI["drives, IOCTL bus/SSD"]
+    WR["Recycle Bin<br/>SHFileOperation, $I/$R"]
+  end
+  subgraph Lin["platform/linux"]
+    LL["openat + fstatat<br/>mounts, hard links"]
+    LI["mountinfo, /sys/class/block"]
+    LT["freedesktop.org Trash"]
+  end
+  MFT["mft/<br/>NTFS reader (Windows)"]
+  SC --> Win
+  SC --> Lin
+  SC --> MFT
+  DE --> Win
+  DE --> Lin
+```
 
 | Command | Purpose |
 |---|---|
-| `info` | Drives (label, file system, size, free space, cluster size) plus bus and media type from the Storage WMI provider, and whether the process is elevated. |
+| `info` | Drives (label, file system, size, free space, cluster size, bus, SSD/HDD), whether the process is elevated or root, and the Trash folders. |
 | `scan <path> <out> [--mft] [--hidden] [--links]` | Scans a drive or folder and writes a `.strata` file. |
 | `dupes <list>` | Given same-size candidate files, finds byte-identical groups. |
 | `delete <list> [recycle\|permanent]` | Deletes paths and reports what is left of each. |
+| `trash-list [path]` / `restore <list>` | Recycle Bin / Trash items that may have come from a path, and putting them back. |
+
+The full contract, with every message, is in [PROTOCOL.md](PROTOCOL.md).
 
 ### Talking to the main process
 
@@ -53,14 +87,19 @@ The scanner writes **JSON lines** to stdout and reads plain-text **commands** fr
 
 ### Folder walk
 
-A pool of worker threads takes folders from a shared stack. Each folder is listed once with `FindFirstFileExW` (large fetch, basic info), which returns sizes, attributes and times without opening every file. Paths longer than 260 characters use the `\\?\` prefix.
+A pool of 2 to 8 threads (`scan/walker.rs`) takes folders from a shared stack, depth-first. Each folder is listed once, by the platform's `DirLister`, and its items are appended to the node list in one go under a lock, so a parent always comes before its children.
 
-- Junctions and symlinks are listed but not entered, unless *Follow* is on. Then the target is resolved with `GetFinalPathNameByHandle`, and each target is entered once and never when it's an ancestor.
-- Cloud placeholders (OneDrive "online-only" files) count as 0 bytes, since they don't use local space.
+- **Windows** (`platform/windows/list.rs`): `FindFirstFileExW` (large fetch, basic info) returns sizes, attributes and times without opening every file. Paths longer than 260 characters use the `\\?\` prefix.
+  - Junctions and symlinks are listed but not entered, unless *Follow* is on. Then the target is resolved with `GetFinalPathNameByHandle`, and each target is entered once and never when it's an ancestor.
+  - Cloud placeholders (OneDrive "online-only" files) count as 0 bytes, since they don't use local space.
+- **Linux** (`platform/linux/list.rs`): the folder is opened once, and each name is `fstatat`'d relative to it, without rebuilding paths.
+  - It stays on one file system: other mount points inside the scanned folder (from `/proc/self/mountinfo`) are listed (as links) but not entered, so `/proc`, `/sys` and other drives aren't counted.
+  - Hidden means a name starting with `.`. Symlinks are links: not followed unless *Follow* is on, and then each target folder (by device and inode) is entered once. Real folders in a listing count as visited before its links, so a link next to the folder it points to isn't followed as well.
+  - Hard-linked files count once, and a file counts its allocated size when that's smaller than its length (sparse files).
 
-### NTFS MFT reader (fast scan)
+### NTFS MFT reader (fast scan, `mft/`)
 
-With administrator rights, the scanner opens the volume (`\\.\C:`) and reads the master file table directly:
+With administrator rights on Windows, the scanner opens the volume (`\\.\C:`) and reads the master file table directly:
 
 1. The boot sector gives the cluster size, the MFT position and the record size.
 2. Record 0 (`$MFT`) gives the MFT's own data runs, including any continued through an `$ATTRIBUTE_LIST`.
@@ -70,7 +109,9 @@ With administrator rights, the scanner opens the volume (`\\.\C:`) and reads the
    - The unnamed `$DATA` attribute gives the logical size, which may come from an extension record.
 4. Parent references are linked into a tree, which is walked depth-first from the root (or from the scanned folder) to produce nodes in parent-before-child order.
 
-If anything fails (not NTFS, no rights, an unexpected structure), the scanner reports a `notice` and falls back to the folder walk.
+If anything fails (not NTFS, no rights, an unexpected structure), the scanner reports a `notice` and falls back to the folder walk. Every read is bounds-checked: a damaged record is skipped, never a crash.
+
+All reading goes through a `ReadAt` trait, so the same code reads a disk image in tests, on any OS. `scanner/tests/fixtures/` holds NTFS images made with `mkntfs` and `ntfs-3g` (`tests/make-ntfs-fixture.py`): non-resident and resident files, DOS 8.3 names, hidden and system items, sparse and compressed files, alternate data streams, a junction, hard links, a file with so many names that it needs an `$ATTRIBUTE_LIST`, and a fragmented MFT with 512-byte clusters. The tests compare the reader's tree with what the mounted file system showed, and `scanner/fuzz/` fuzzes the record and volume parsers.
 
 ### The `.strata` scan file
 
@@ -93,16 +134,25 @@ names (UTF-8, NUL-separated)
 
 Saved scans live in the data folder (`scans/`), alongside an `index.json` of recent scans.
 
+### Drives (`info`)
+
+- **Windows:** `GetLogicalDrives`, `GetVolumeInformation` and `GetDiskFreeSpaceEx`; bus and SSD/HDD from the storage driver (`IOCTL_STORAGE_QUERY_PROPERTY`: device descriptor and seek penalty), which needs no administrator rights.
+- **Linux:** the mounted file systems from `/proc/self/mountinfo`. Pseudo file systems (proc, sysfs, tmpfs, overlay, squashfs…) and system mounts (`/boot`, `/snap`, container storage…) are left out; drives mounted under `/run/media` are kept. Sizes come from `statfs`; bus, SSD/HDD and removable come from `/sys/class/block` (through partitions, LVM and LUKS to the disk), labels from `/dev/disk/by-label`. Drives have `letter: null`; the UI names them by label or mount point.
+
+### Recycle Bin and Trash
+
+- **Windows** (`platform/windows/recycle.rs`): `SHFileOperation` in batches of 64, with `FOF_WANTNUKEWARNING` so Windows warns instead of deleting for good when something is too big to recycle; what fails is retried one by one. `trash-list` reads the `$I` metadata files in `X:\$Recycle.Bin\<SID>\` (versions 1 and 2), and `restore` moves the matching `$R` item back.
+- **Linux** (`platform/linux/trash.rs`): the **freedesktop.org Trash**. The home Trash (`$XDG_DATA_HOME/Trash`, usually `~/.local/share/Trash`) when the item is on the same file system, otherwise `$topdir/.Trash/$uid` (when it's a sticky folder, not a link) or `$topdir/.Trash-$uid` on the item's own drive. A `.trashinfo` file with the original path and the local date is reserved with `O_EXCL` before the move, as the spec asks.
+- **Permanent** deletion is shared (`delete.rs`): recursive, links and junctions removed as links, never followed; read-only attributes cleared on Windows.
+
 ## Main process (`src/main/`)
 
 - Creates the window (sandboxed renderer, context isolation, no Node in the UI) and exposes a narrow API through `preload.js`.
 - Starts the scanner for scans, duplicates and deletions, forwards progress to the UI, and mirrors scan progress on the taskbar button.
 - Keeps settings, recent scans and the 7-day history as small JSON files. Writes go to a temporary file first, then get renamed.
-- **Deletion:** targets are expanded (a "contents only" target, such as a temp folder, becomes its children), protected paths are refused, and the scanner does the work:
-  - **Recycle Bin:** `SHFileOperation` in batches, with a warning if something is too big to recycle.
-  - **Permanent:** a recursive delete that removes links without following them.
-- **Restore:** reads the Recycle Bin's `$I` metadata files to find where an item came from, then moves the matching `$R` file back.
-- **Restart as administrator:** relaunches through `Start-Process -Verb RunAs` and passes the pending scan along.
+- **Deletion:** targets are expanded (a "contents only" target, such as a temp folder, becomes its children), protected paths are refused (`src/main/platform.js`, plus the drives and Trash folders from the scanner's `info`), and the scanner does the work.
+- **Restore:** asks the scanner which Recycle Bin / Trash items match a history entry (`trash-list`), then has it put them back (`restore`).
+- **Restart as administrator:** relaunches through `Start-Process -Verb RunAs` and passes the pending scan along. Windows only: Linux has no file-table fast scan, and GUI apps shouldn't run as root.
 
 ## UI (`src/renderer/`)
 

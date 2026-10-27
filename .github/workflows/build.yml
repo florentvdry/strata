@@ -20,15 +20,40 @@ jobs:
           node-version: 22
           cache: npm
 
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: scanner
+
       - name: Install dependencies
         run: npm ci
 
       - name: Check renderer syntax
         shell: bash
-        run: for f in $(find src -name '*.js'); do node --check "$f"; done
+        run: for f in $(find src scripts -name '*.js'); do node --check "$f"; done
 
       - name: Check import map and CSP hash
         run: npm run check
+
+      - name: Scanner format, lints and unit tests
+        working-directory: scanner
+        run: |
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+
+      - name: Build the scanner
+        run: npm run build:scanner
+
+      - name: Test the scanner end to end
+        run: npm run test:scanner
+
+      # The runner is administrator and C: is NTFS.
+      - name: Fast scan finds the same tree as a folder walk
+        run: node scripts/check-fast-scan.js --bench
 
       - name: Build installer and portable app
         run: npm run dist
@@ -41,3 +66,92 @@ jobs:
             dist/Strata-*-Portable.exe
           if-no-files-found: error
           retention-days: 14
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      # The scanner is built for musl: one static binary for every distribution.
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: scanner
+
+      # musl-tools for the scanner, ntfs-3g and zstd for fresh NTFS test images, rpm and bsdtar for the packages.
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends musl-tools ntfs-3g zstd rpm libarchive-tools
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check renderer syntax
+        run: for f in $(find src scripts -name '*.js'); do node --check "$f"; done
+
+      - name: Check import map and CSP hash
+        run: npm run check
+
+      - name: Scanner format, lints and unit tests
+        working-directory: scanner
+        run: |
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+
+      - name: Fast scan on freshly made NTFS images
+        working-directory: scanner
+        run: |
+          sudo python3 tests/make-ntfs-fixture.py "$RUNNER_TEMP/ntfs"
+          STRATA_NTFS_FIXTURES="$RUNNER_TEMP/ntfs" cargo test --locked mft::
+
+      - name: Build the scanner
+        run: npm run build:scanner
+
+      - name: Test the scanner end to end
+        run: npm run test:scanner
+
+      - name: Build AppImage, deb, rpm, pacman and tar.gz
+        run: npm run dist:linux
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: strata-linux
+          path: |
+            dist/Strata-*.AppImage
+            dist/Strata-*.deb
+            dist/Strata-*.rpm
+            dist/Strata-*.pacman
+            dist/Strata-*.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+  # A short run of each fuzz target on the NTFS file-table reader: damaged data must never crash it.
+  fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@nightly
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: scanner/fuzz
+
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz --locked
+
+      - name: Fuzz
+        working-directory: scanner
+        run: |
+          python3 fuzz/seed-corpus.py
+          cargo fuzz run mft_record -- -max_total_time=90 -rss_limit_mb=2048
+          cargo fuzz run mft_volume -- -max_total_time=60 -max_len=262144 -rss_limit_mb=2048

@@ -5,6 +5,7 @@ import { useStore } from '../lib/store.js';
 import { Icon } from '../components/ui.js';
 import { CATS, selectionStats } from '../lib/cleanup.js';
 import { bytesParts, fmtBytes, plural } from '../lib/format.js';
+import { isWin, TRASH } from '../lib/platform.js';
 import * as A from '../actions.js';
 
 export function Cleanup() {
@@ -25,7 +26,7 @@ export function Cleanup() {
   const after = Math.max(0, used - stats.bytes);
   const big = stats.bytes > 0 ? bytesParts(stats.bytes, 1) : { num: '0', unit: 'GB' };
   const count = stats.chosen.length;
-  const driveLabel = drive ? `${drive.letter}:` : 'Drive';
+  const driveLabel = drive ? (isWin ? `${drive.letter}:` : drive.label || (drive.system ? 'System drive' : drive.root)) : 'Drive';
   const dupesBusy = dupes.status === 'running' || dupes.status === 'pending';
 
   function go() {
@@ -59,7 +60,7 @@ export function Cleanup() {
         })}
         <div style="margin-top: 16px; padding: 14px; border-radius: 12px; border: 1px solid #22262D; background: #14171C; display: flex; flex-direction: column; gap: 6px">
           <span style="font-weight: 600">How deletion works</span>
-          <span style="font-size: 13px; color: #9BA3AF; line-height: 1.5">Files go to the Recycle Bin by default. Caches and temp folders are emptied, not removed, and files in use are skipped.</span>
+          <span style="font-size: 13px; color: #9BA3AF; line-height: 1.5">Files go to the ${TRASH} by default. Caches and temp folders are emptied, not removed, and files in use are skipped.</span>
         </div>
       </nav>
 
@@ -115,11 +116,11 @@ export function Cleanup() {
         </div>
         <label style="display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: #C9CED6; cursor: pointer">
           <input type="checkbox" checked=${permanent} onChange=${(e) => A.setPermanent(e.currentTarget.checked)} style="width: 18px; height: 18px; accent-color: #FF9AA2; margin: 0" />
-          <span>Delete permanently (skip Recycle Bin)</span>
+          <span>Delete permanently (skip ${TRASH})</span>
         </label>
         <button type="button" class="hov-accent" disabled=${!count} onClick=${go}
           style=${`height: 48px; border-radius: 12px; border: 0; font-weight: 600; font-size: 15px; cursor: pointer; ${permanent ? 'background:#FF9AA2;color:#2A0A0E' : 'background:var(--accent);color:#0E1014'}`}>
-          ${permanent ? `Delete ${plural(count, 'item')} permanently` : `Move ${plural(count, 'item')} to Recycle Bin`}
+          ${permanent ? `Delete ${plural(count, 'item')} permanently` : `Move ${plural(count, 'item')} to ${TRASH}`}
         </button>
         <span style="font-size: 12px; color: #9BA3AF; line-height: 1.5">A restore point list is kept for 7 days in <a href="#" onClick=${(e) => { e.preventDefault(); A.openModal({ kind: 'history' }); }}>Strata › History</a>.</span>
       </aside>

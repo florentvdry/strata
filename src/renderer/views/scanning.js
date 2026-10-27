@@ -6,6 +6,7 @@ import { Logo } from '../components/ui.js';
 import { TYPES, SHADE } from '../lib/types.js';
 import { squarify } from '../lib/squarify.js';
 import { fmtBytes, fmtCount, fmtDur, fmtEta, middleEllipsis } from '../lib/format.js';
+import { isWin, trimSep } from '../lib/platform.js';
 import * as A from '../actions.js';
 
 const PHASES = { mft: 'Reading file table', walk: 'Walking folders', build: 'Building the map' };
@@ -28,7 +29,7 @@ function LiveMap({ scan, shading }) {
   const ref = useRef(null);
   const box = useBox(ref);
   const drive = A.driveOf(scan.root);
-  const isDriveRoot = drive && drive.root.toLowerCase() === scan.root.toLowerCase().replace(/\\?$/, '\\');
+  const isDriveRoot = drive && (isWin ? drive.root.toLowerCase() === scan.root.toLowerCase().replace(/\\?$/, '\\') : drive.root === trimSep(scan.root));
   const known = scan.tops.filter((t) => t.bytes > 0).sort((a, b) => b.bytes - a.bytes).slice(0, 28);
   const pending = scan.tops.filter((t) => t.dir && t.state === 0 && t.bytes === 0).slice(0, 10);
   let tiles = [];
