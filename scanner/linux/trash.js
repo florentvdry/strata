@@ -34,6 +34,14 @@ function devOf(p) {
   try { return fs.statSync(p).dev; } catch { return -1; }
 }
 
+// Device of a folder that may not exist yet (a new user has no ~/.local/share): its nearest existing ancestor's.
+function devOfFuture(p) {
+  for (let d = p; ; d = path.dirname(d)) {
+    const dev = devOf(d);
+    if (dev >= 0 || d === path.dirname(d)) return dev;
+  }
+}
+
 // Paths in .trashinfo files are URL-encoded; the home trash stores absolute paths, a topdir trash relative ones.
 function encodePath(p) { return p.split('/').map(encodeURIComponent).join('/'); }
 
@@ -69,8 +77,7 @@ function trashItem(p, mounts = readMounts()) {
   const home = homeTrash();
   const parentDev = devOf(path.dirname(p));
   // Home trash when it lives on the same file system (rename can't cross devices).
-  const homeRoot = fs.existsSync(home) ? home : path.dirname(home);
-  if (parentDev >= 0 && parentDev === devOf(homeRoot)) {
+  if (parentDev >= 0 && parentDev === devOfFuture(home)) {
     try { return moveInto(home, p, p); } catch (e) { if (e.code !== 'EXDEV') throw e; }
   }
   const m = mountOf(p, mounts);

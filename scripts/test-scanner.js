@@ -172,6 +172,8 @@ async function main() {
   process.env.XDG_DATA_HOME = dataHome;
   const entries = trashEntries(trashed).filter((e) => e.original === trashed);
   assert.strictEqual(entries.length, 1, 'trashinfo found');
+  // Same file system as the (not yet created) home Trash: it goes there, not to a $topdir/.Trash-$uid.
+  assert.ok(entries[0].info.startsWith(path.join(dataHome, 'Trash') + path.sep), `home Trash used, got ${entries[0].info}`);
   assert.ok(fs.existsSync(path.join(entries[0].data, 'a', 'report.pdf')), 'content in Trash/files');
   assert.ok(Math.abs(entries[0].deletedAt - Date.now()) < 60000, 'deletion date');
   // Trashing a second item with the same name gets a new name.
