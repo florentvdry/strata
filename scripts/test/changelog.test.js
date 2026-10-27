@@ -93,3 +93,36 @@ test('the repository changelog passes its own check', () => {
   const r = spawnSync(process.execPath, [path.join(__dirname, '..', 'changelog.js'), 'check'], { encoding: 'utf8' });
   assert.strictEqual(r.status, 0, r.stderr);
 });
+
+test('a release bumps the version everywhere and leaves a changelog that passes the check', () => {
+  const fs = require('fs');
+  const os = require('os');
+  const { spawnSync } = require('child_process');
+  const root = path.join(__dirname, '..', '..');
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'strata-release-'));
+  const files = ['CHANGELOG.md', 'package.json', 'package-lock.json', 'scripts/changelog.js', 'src/renderer/package.json', 'src/renderer/lib/changelog.js',
+    'src/renderer/lib/changelog-data.js', 'src/app/Cargo.toml', 'src/app/Cargo.lock', 'scanner/Cargo.toml', 'scanner/Cargo.lock', 'scanner/fuzz/Cargo.lock'];
+  for (const f of files) {
+    fs.mkdirSync(path.dirname(path.join(tmp, f)), { recursive: true });
+    fs.copyFileSync(path.join(root, f), path.join(tmp, f));
+  }
+  const run = (...args) => spawnSync(process.execPath, [path.join(tmp, 'scripts', 'changelog.js'), ...args], { cwd: tmp, encoding: 'utf8' });
+  const r = run('release', '9.9.9', '--date=2030-01-02');
+  assert.strictEqual(r.status, 0, r.stderr);
+  const read = (f) => fs.readFileSync(path.join(tmp, f), 'utf8');
+  assert.strictEqual(JSON.parse(read('package.json')).version, '9.9.9');
+  assert.strictEqual(JSON.parse(read('package-lock.json')).packages[''].version, '9.9.9');
+  assert.match(read('src/app/Cargo.toml'), /^version = "9\.9\.9"$/m);
+  assert.match(read('scanner/Cargo.toml'), /^version = "9\.9\.9"$/m);
+  assert.match(read('src/app/Cargo.lock'), /name = "strata"\r?\nversion = "9\.9\.9"/);
+  for (const f of ['scanner/Cargo.lock', 'scanner/fuzz/Cargo.lock']) assert.match(read(f), /name = "strata-scan"\r?\nversion = "9\.9\.9"/);
+  assert.match(read('CHANGELOG.md'), /## \[9\.9\.9\] - 2030-01-02/);
+  assert.match(read('CHANGELOG.md'), /^\[Unreleased\]: .*\/compare\/v9\.9\.9\.\.\.HEAD$/m);
+  const check = run('check');
+  assert.strictEqual(check.status, 0, check.stderr);
+  // One file out of step is reported.
+  fs.writeFileSync(path.join(tmp, 'scanner/Cargo.toml'), read('scanner/Cargo.toml').replace('version = "9.9.9"', 'version = "1.0.0"'));
+  const bad = run('check');
+  assert.notStrictEqual(bad.status, 0);
+  assert.ok(bad.stderr.includes('scanner/Cargo.toml says 1.0.0'));
+});

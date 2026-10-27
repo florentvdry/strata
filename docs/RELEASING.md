@@ -37,7 +37,7 @@ The Release workflow refuses to run while the public key is a placeholder or the
 
 ## Making a release
 
-1. `npm run release -- 0.3.0` (or `0.3.0-beta.1` for a beta). It moves *Unreleased* under the new version with today's date, updates the compare links, bumps `package.json`, `package-lock.json`, `src/app/Cargo.toml` and `Cargo.lock`, and regenerates the app's release notes. Add `--date=YYYY-MM-DD` to set the date.
+1. `npm run release -- 0.3.0` (or `0.3.0-beta.1` for a beta). It moves *Unreleased* under the new version with today's date, updates the compare links, bumps the version in `package.json`, `package-lock.json`, the app's and the scanner's `Cargo.toml` and `Cargo.lock` files (the scanner's `--version` reports it), and the changelog check fails if any of them falls out of step, and regenerates the app's release notes. Add `--date=YYYY-MM-DD` to set the date.
 2. Review `git diff`, commit, open a pull request and merge it. (The website rebuilds on merge and will show the new version a few minutes before the files exist; tag right away.)
 3. Tag the merge commit and push the tag: `git tag v0.3.0 && git push origin v0.3.0`.
 

@@ -28,12 +28,16 @@ function generatedModule(L, releases) {
   return `// Generated from CHANGELOG.md by \`npm run sync:changelog\`. Don't edit.\nexport default ${JSON.stringify(data, null, 2)};\n`;
 }
 
-function versions() {
-  const pkg = JSON.parse(read('package.json')).version;
-  const cargo = /^version\s*=\s*"([^"]+)"/m.exec(read('src', 'app', 'Cargo.toml').split('[dependencies]')[0])[1];
-  const lock = /name = "strata"\r?\nversion = "([^"]+)"/.exec(read('src', 'app', 'Cargo.lock'));
-  return { pkg, cargo, lock: lock && lock[1] };
-}
+// Everything that carries the app's version: [file, how to read it, how to rewrite it].
+const cargoHead = (text) => text.slice(0, text.search(/^\[(?!package\])/m));
+const VERSION_FILES = [
+  ['package.json', (t) => JSON.parse(t).version],
+  ['src/app/Cargo.toml', (t) => /^version\s*=\s*"([^"]+)"/m.exec(cargoHead(t))[1]],
+  ['src/app/Cargo.lock', (t) => (/name = "strata"\r?\nversion = "([^"]+)"/.exec(t) || [])[1]],
+  ['scanner/Cargo.toml', (t) => /^version\s*=\s*"([^"]+)"/m.exec(cargoHead(t))[1]],
+  ['scanner/Cargo.lock', (t) => (/name = "strata-scan"\r?\nversion = "([^"]+)"/.exec(t) || [])[1]],
+  ['scanner/fuzz/Cargo.lock', (t) => (/name = "strata-scan"\r?\nversion = "([^"]+)"/.exec(t) || [])[1]],
+];
 
 async function check() {
   const L = await lib();
@@ -53,10 +57,10 @@ async function check() {
   });
   if (unreleased && !/^\[Unreleased\]: https?:\/\//m.test(md)) problems.push('Missing the "[Unreleased]: https://…" link line at the bottom.');
 
-  const v = versions();
-  if (v.pkg !== v.cargo) problems.push(`package.json (${v.pkg}) and src/app/Cargo.toml (${v.cargo}) have different versions.`);
-  if (v.lock && v.lock !== v.cargo) problems.push(`src/app/Cargo.lock says ${v.lock}; run cargo update -p strata or \`npm run release\`.`);
-  if (releases[0] && L.compareVersions(v.pkg, releases[0].version) < 0) problems.push(`package.json (${v.pkg}) is older than the newest changelog entry (${releases[0].version}).`);
+  const found = VERSION_FILES.map(([f, get]) => [f, get(read(...f.split('/')))]);
+  const pkg = found[0][1];
+  for (const [f, v] of found) if (v !== pkg) problems.push(`${f} says ${v}, package.json says ${pkg}. \`npm run release\` bumps them together.`);
+  if (releases[0] && L.compareVersions(pkg, releases[0].version) < 0) problems.push(`package.json (${pkg}) is older than the newest changelog entry (${releases[0].version}).`);
 
   const expected = generatedModule(L, releases);
   if (!fs.existsSync(file(GENERATED)) || read(GENERATED) !== expected) problems.push(`${GENERATED} is out of date. Run: npm run sync:changelog`);
@@ -85,16 +89,19 @@ async function notes(version, internal) {
 }
 
 function bump(version) {
-  const sub = (p, re, to) => { const s = read(p); if (!re.test(s)) throw new Error(`Couldn't find the version in ${p}`); write(p, s.replace(re, to)); };
+  const sub = (p, re, to) => { const s = read(...p.split('/')); if (!re.test(s)) throw new Error(`Couldn't find the version in ${p}`); write(p, s.replace(re, to)); };
   sub('package.json', /("version":\s*")[^"]+(")/, `$1${version}$2`);
   const lock = JSON.parse(read('package-lock.json'));
   lock.version = version;
   if (lock.packages && lock.packages['']) lock.packages[''].version = version;
   write('package-lock.json', `${JSON.stringify(lock, null, 2)}\n`);
-  const cargo = read('src', 'app', 'Cargo.toml');
-  const head = cargo.slice(0, cargo.indexOf('[build-dependencies]'));
-  write('src/app/Cargo.toml', cargo.replace(head, head.replace(/^(version\s*=\s*")[^"]+(")/m, `$1${version}$2`)));
+  for (const p of ['src/app/Cargo.toml', 'scanner/Cargo.toml']) {
+    const cargo = read(...p.split('/'));
+    const head = cargoHead(cargo);
+    write(p, cargo.replace(head, head.replace(/^(version\s*=\s*")[^"]+(")/m, `$1${version}$2`)));
+  }
   sub('src/app/Cargo.lock', /(name = "strata"\r?\nversion = ")[^"]+(")/, `$1${version}$2`);
+  for (const p of ['scanner/Cargo.lock', 'scanner/fuzz/Cargo.lock']) sub(p, /(name = "strata-scan"\r?\nversion = ")[^"]+(")/, `$1${version}$2`);
 }
 
 async function release(version, dateArg) {
