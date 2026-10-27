@@ -286,7 +286,7 @@ const modeHint = (mode) => ({
 
 function UpdateDialog() {
   const { update: u, info } = useStore();
-  if (!u || !u.version) return html`<${Dialog} title=${t('No update')} onClose=${A.closeModal}><p>${updateStatus(u, info.version)}</p><div class="actions"><button class="btn primary" onClick=${A.closeModal}>Done</button></div><//>`;
+  if (!u || !u.version) return html`<${Dialog} title=${t('No update')} onClose=${A.closeModal}><p>${updateStatus(u, info.version)}</p><div class="actions"><button class="btn primary" onClick=${A.closeModal}>${t('Done')}</button></div><//>`;
   const manual = u.mode === 'manual';
   const downloading = u.phase === 'downloading';
   const pct = u.total ? Math.min(1, u.downloaded / u.total) : 0;

@@ -1,7 +1,7 @@
-import { t } from './i18n.js';
 // The in-memory scan result: flat typed arrays, parents before children.
 import { TYPE_COUNT, typeOfName } from './types.js';
 import { sep, fold } from './platform.js';
+import { t } from './i18n.js';
 
 export const F_DIR = 1, F_HIDDEN = 2, F_SYSTEM = 4, F_REPARSE = 8, F_DENIED = 16, F_CLOUD = 32;
 
