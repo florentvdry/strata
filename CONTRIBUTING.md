@@ -6,7 +6,7 @@ By taking part you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Ways to help
 
-- **Report a bug:** open an issue with the *Bug report* template. Include your Windows version, the Strata version (shown in the footer and in Settings) and the steps to reproduce.
+- **Report a bug:** open an issue with the *Bug report* template. Include your Windows version or Linux distribution, the Strata version (shown in the footer and in Settings) and the steps to reproduce.
 - **Suggest a feature:** open an issue with the *Feature request* template and describe the problem before the solution.
 - **Improve cleanup rules:** if Strata misses a common cache or suggests something it shouldn't, that's very useful to know. Rules live in [`src/renderer/lib/cleanup.js`](src/renderer/lib/cleanup.js).
 - **Send a pull request:** for anything bigger than a small fix, open an issue first so we can agree on the approach.
@@ -15,7 +15,7 @@ Security problems should **not** go in public issues. See [SECURITY.md](SECURITY
 
 ## Development setup
 
-Requirements: Windows 10/11, Node.js 20+ (22+ for `npm run screenshots`), Git.
+Requirements: Windows 10/11 or Linux, Node.js 20+ (22+ for `npm run screenshots`), Git.
 
 ```bash
 git clone https://github.com/florentvdry/strata.git
@@ -24,7 +24,7 @@ npm install
 npm start
 ```
 
-`npm start` compiles the scanner (`scanner/StrataScan.cs`) with the C# compiler included in Windows, then launches Electron. Press <kbd>F12</kbd> for DevTools and <kbd>Ctrl</kbd> + <kbd>R</kbd> to reload the UI.
+On Windows, `npm start` compiles the scanner (`scanner/StrataScan.cs`) with the C# compiler included in Windows, then launches Electron. On Linux there's nothing to compile: the scanner in `scanner/linux/` is run by Electron's Node.js. Press <kbd>F12</kbd> for DevTools and <kbd>Ctrl</kbd> + <kbd>R</kbd> to reload the UI.
 
 If Electron didn't download during `npm install` (newer npm versions can block install scripts), run `node node_modules/electron/install.js`.
 
@@ -32,7 +32,9 @@ If Electron didn't download during `npm install` (newer npm versions can block i
 
 | Path | What's there |
 |---|---|
-| `scanner/StrataScan.cs` | The scanner process: folder walk, NTFS MFT reader, duplicate finder, deletion. |
+| `scanner/StrataScan.cs` | The Windows scanner process: folder walk, NTFS MFT reader, duplicate finder, deletion. |
+| `scanner/linux/` | The Linux scanner: same commands and scan file, mounted drives, freedesktop.org Trash. |
+| `src/renderer/lib/platform.js` | Path separator, case-sensitivity and wording that differ between Windows and Linux. |
 | `src/main/` | Electron main process: window, spawning the scanner, files, settings, history, IPC. |
 | `src/main/preload.js` | The only bridge between the UI and the system (`window.strata`). |
 | `src/renderer/views/` | The four screens: Start, Scanning, Explorer, Cleanup. |
@@ -48,6 +50,7 @@ If Electron didn't download during `npm install` (newer npm versions can block i
 - **No build step in the UI.** The renderer is plain ES modules with Preact + htm, loaded straight from disk. Don't add a bundler or transpiler.
 - **htm templates need self-closing void tags.** Write `<input ... />`, not `<input ...>`.
 - **The scanner targets C# 5.** It's compiled by the .NET Framework `csc.exe`, so no string interpolation, `?.`, expression-bodied members or tuples.
+- **Keep both scanners in step.** A change to the protocol, the scan file or the file-type lists goes into `StrataScan.cs` and `scanner/linux/strata-scan.js` together. Never hard-code `\` in the UI: use `sep`, `fold` and friends from `lib/platform.js`.
 - **Keep the design.** Colors, spacing and type sizes come from the original mockups. Reuse the existing tokens (`--accent`, the gray scale, `Geist` / `Geist Mono`) rather than adding new ones.
 - **Be careful with anything that deletes.** Changes to cleanup rules or deletion code need a clear reason and a manual test on throwaway files.
 - **No network access and no telemetry.** Strata works offline and should stay that way.
@@ -60,7 +63,7 @@ There's no automated UI test suite yet, so please check your change by hand. A g
 2. `npm start`, then scan a small folder and a drive. Try both normal and, if you can, fast scan as administrator.
 3. Exercise what you touched: the map views, search, smart views, cleanup selection.
 4. For deletion changes, use a throwaway folder: recycle, delete permanently, a file that's in use, a path longer than 260 characters.
-5. `npm run pack` and run `dist/win-unpacked/Strata.exe` to make sure the packaged build works.
+5. `npm run pack` and run `dist/win-unpacked/Strata.exe` to make sure the packaged build works. On Linux: `npm run test:scanner`, then `npm run pack:linux` and run `dist/linux-unpacked/strata`.
 
 If your change affects how a screen looks, run `npm run screenshots` and commit the updated images.
 
@@ -74,5 +77,5 @@ If your change affects how a screen looks, run `npm run screenshots` and commit 
 ## Releasing (maintainers)
 
 1. Update the version in `package.json` and move the **Unreleased** notes in `CHANGELOG.md` under the new version.
-2. `npm run dist`. This builds `dist/Strata-Setup-<version>.exe` and `dist/Strata-<version>-Portable.exe`.
-3. Smoke-test both, commit, tag `v<version>`, push, and create a GitHub release with both files and their SHA-256 checksums.
+2. `npm run dist` on Windows builds `dist/Strata-Setup-<version>.exe` and `dist/Strata-<version>-Portable.exe`; `npm run dist:linux` on Linux builds the AppImage, `.deb`, `.rpm`, `.pacman` and `.tar.gz` (or take both sets from the CI artifacts).
+3. Smoke-test them, commit, tag `v<version>`, push, and create a GitHub release with all the files and their SHA-256 checksums.

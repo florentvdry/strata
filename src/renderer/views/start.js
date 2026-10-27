@@ -3,11 +3,17 @@ import { html } from '../lib/html.js';
 import { useStore } from '../lib/store.js';
 import { Logo, Icon } from '../components/ui.js';
 import { fmtBytes, fmtWhen } from '../lib/format.js';
+import { isWin } from '../lib/platform.js';
 import * as A from '../actions.js';
 
 const api = window.strata;
 
 export function driveName(d) {
+  if (!isWin) {
+    // Linux: the mount point says where it is; the label (or "System" for /) says what it is.
+    const name = d.label || (d.system ? 'System' : null);
+    return name ? `${name} (${d.root})` : d.root;
+  }
   return `${d.letter}: ${d.label || (d.system ? 'System' : d.kind === 'Network' ? 'Network' : 'Local Disk')}`;
 }
 
@@ -72,7 +78,9 @@ export function Start() {
     <main style="flex: 1; width: 100%; max-width: 1080px; margin: 0 auto; padding: 56px 20px 40px; box-sizing: border-box; display: flex; flex-direction: column; gap: 40px">
       <div style="display: flex; flex-direction: column; gap: 10px">
         <h1 style="margin: 0; font-size: 44px; font-weight: 700; letter-spacing: -0.035em; line-height: 1.05">What should we map?</h1>
-        <p style="margin: 0; font-size: 16px; color: #9BA3AF; max-width: 560px; line-height: 1.5">Pick a drive or a folder. Strata reads the file table directly, so a full system drive usually takes under a minute.</p>
+        <p style="margin: 0; font-size: 16px; color: #9BA3AF; max-width: 560px; line-height: 1.5">${isWin
+          ? 'Pick a drive or a folder. Strata reads the file table directly, so a full system drive usually takes under a minute.'
+          : 'Pick a drive or a folder. Strata reads many folders at once, so a full system drive usually takes under a minute.'}</p>
       </div>
 
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px">
@@ -88,9 +96,9 @@ export function Start() {
         <section style="flex: 1 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
           <h2 style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #8C94A0">Scan options</h2>
           <div style="display: flex; flex-direction: column; border-radius: 12px; border: 1px solid #22262D; background: #14171C">
-            <${Option} checked=${opts.mft} onChange=${(v) => A.setScanOption('mft', v)} title="Fast scan (read the MFT)" hint=${fastHint} />
-            <${Option} checked=${opts.hidden} onChange=${(v) => A.setScanOption('hidden', v)} title="Include hidden & system files" hint="pagefile, hiberfil, WinSxS…" />
-            <${Option} checked=${opts.links} onChange=${(v) => A.setScanOption('links', v)} title="Follow junctions & symlinks" hint="Off avoids counting the same bytes twice" last />
+            ${isWin && html`<${Option} checked=${opts.mft} onChange=${(v) => A.setScanOption('mft', v)} title="Fast scan (read the MFT)" hint=${fastHint} />`}
+            <${Option} checked=${opts.hidden} onChange=${(v) => A.setScanOption('hidden', v)} title=${isWin ? 'Include hidden & system files' : 'Include hidden files'} hint=${isWin ? 'pagefile, hiberfil, WinSxS…' : 'Dot-folders such as .cache, .local and .config'} />
+            <${Option} checked=${opts.links} onChange=${(v) => A.setScanOption('links', v)} title=${isWin ? 'Follow junctions & symlinks' : 'Follow symlinks'} hint="Off avoids counting the same bytes twice" last />
           </div>
         </section>
         <section style="flex: 1 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 12px">

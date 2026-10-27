@@ -1,4 +1,4 @@
-// File-type categories. Indices match FileTypes in scanner/StrataScan.cs.
+// File-type categories. Indices match FileTypes in scanner/StrataScan.cs and scanner/linux/strata-scan.js.
 export const TYPES = [
   { id: 'other',   c: '#7B8390', fg: '#0E1014', l: 'Other' },
   { id: 'video',   c: '#3B82F6', fg: '#071226', l: 'Video' },
@@ -28,7 +28,7 @@ const extMap = {};
 for (const [k, v] of Object.entries(EXT)) for (const e of v.split(' ')) extMap[e] = T[k];
 
 export function typeOfName(name) {
-  const m = /\.([^.\\]+)$/.exec(name);
+  const m = /\.([^.\\/]+)$/.exec(name);
   return (m && extMap[m[1].toLowerCase()]) || 0;
 }
 

@@ -1,5 +1,6 @@
 // The in-memory scan result: flat typed arrays, parents before children.
 import { TYPE_COUNT, typeOfName } from './types.js';
+import { sep, fold } from './platform.js';
 
 export const F_DIR = 1, F_HIDDEN = 2, F_SYSTEM = 4, F_REPARSE = 8, F_DENIED = 16, F_CLOUD = 32;
 
@@ -137,13 +138,13 @@ export class Tree {
     for (let c = i; c > 0; c = this.parent[c]) parts.push(this.names[c]);
     parts.reverse();
     const root = this.names[0];
-    return (root.endsWith('\\') ? root : root + '\\') + parts.join('\\');
+    return (root.endsWith(sep) ? root : root + sep) + parts.join(sep);
   }
 
   // Path relative to the scan root.
   rel(i) {
     const p = this.path(i), r = this.names[0];
-    return p.slice(r.endsWith('\\') ? r.length : r.length + 1) || p;
+    return p.slice(r.endsWith(sep) ? r.length : r.length + 1) || p;
   }
 
   ancestors(i) {
@@ -162,22 +163,23 @@ export class Tree {
   depth(i) { let d = 0; for (let c = i; c > 0; c = this.parent[c]) d++; return d; }
 
   childNamed(i, name) {
-    const lower = name.toLowerCase();
+    const want = fold(name);
     for (let k = this.childStart[i], e = this.childStart[i + 1]; k < e; k++) {
       const c = this.childList[k];
-      if (!this.removed[c] && this.names[c].toLowerCase() === lower) return c;
+      if (!this.removed[c] && fold(this.names[c]) === want) return c;
     }
     return -1;
   }
 
   // Absolute path → node, or -1 when it's outside this scan.
   lookup(abs) {
-    const root = this.names[0].replace(/\\$/, '');
-    const a = abs.replace(/\\$/, '');
-    if (a.toLowerCase() === root.toLowerCase()) return 0;
-    if (!a.toLowerCase().startsWith(root.toLowerCase() + '\\')) return -1;
+    const strip = (p) => (p.endsWith(sep) ? p.slice(0, -1) : p);
+    const root = strip(this.names[0]);
+    const a = strip(abs);
+    if (fold(a) === fold(root)) return 0;
+    if (!fold(a).startsWith(fold(root) + sep)) return -1;
     let cur = 0;
-    for (const part of a.slice(root.length + 1).split('\\')) {
+    for (const part of a.slice(root.length + 1).split(sep)) {
       if (!part) continue;
       cur = this.childNamed(cur, part);
       if (cur < 0) return -1;

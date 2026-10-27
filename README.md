@@ -6,14 +6,14 @@
 
 <p align="center">
   <b>See what fills your disk, then clean it up.</b><br>
-  A fast, modern disk space analyzer for Windows, in the spirit of WinDirStat.
+  A fast, modern disk space analyzer for Windows and Linux, in the spirit of WinDirStat.
 </p>
 
 <p align="center">
   <a href="https://github.com/florentvdry/strata/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/florentvdry/strata?style=flat-square&color=C6F432&labelColor=12151A"></a>
   <a href="https://github.com/florentvdry/strata/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/florentvdry/strata/total?style=flat-square&color=3B82F6&labelColor=12151A"></a>
   <a href="https://github.com/florentvdry/strata/actions/workflows/build.yml"><img alt="Build" src="https://img.shields.io/github/actions/workflow/status/florentvdry/strata/build.yml?branch=main&style=flat-square&labelColor=12151A"></a>
-  <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-F59E0B?style=flat-square&labelColor=12151A">
+  <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011%20%7C%20Linux-F59E0B?style=flat-square&labelColor=12151A">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/github/license/florentvdry/strata?style=flat-square&color=A78BFA&labelColor=12151A"></a>
 </p>
 
@@ -46,6 +46,23 @@ Requires Windows 10 or 11 (x64). Each release lists SHA-256 checksums for verifi
 > [!NOTE]
 > The builds aren't code-signed yet, so Windows SmartScreen may say *"Windows protected your PC"*. Click **More info › Run anyway**.
 
+### Linux
+
+Strata runs on the common x64 distributions. Pick the package for yours:
+
+| Distribution | File | Install |
+|---|---|---|
+| Ubuntu, Debian, Linux Mint, Pop!_OS, elementary | `Strata-<version>-amd64.deb` | `sudo apt install ./Strata-<version>-amd64.deb` |
+| Fedora, RHEL, Rocky, AlmaLinux, openSUSE | `Strata-<version>-x86_64.rpm` | `sudo dnf install ./Strata-<version>-x86_64.rpm` (openSUSE: `sudo zypper install …`) |
+| Arch, Manjaro, EndeavourOS | `Strata-<version>-x64.pacman` | `sudo pacman -U ./Strata-<version>-x64.pacman` |
+| Any distribution | `Strata-<version>-x86_64.AppImage` | `chmod +x Strata-*.AppImage && ./Strata-*.AppImage` |
+| Any distribution, no install | `Strata-<version>-x64.tar.gz` | Extract and run `./strata` |
+
+The packages add Strata to your application menu; from a terminal, run `strata`.
+
+> [!TIP]
+> On Ubuntu 24.04 and later, an AppImage or the `.tar.gz` build may quit at launch with a sandbox error, because AppArmor restricts the user namespaces Chromium uses. Install the `.deb` instead (it sets the sandbox up), or start the app with `--no-sandbox`. The AppImage also needs FUSE: `sudo apt install libfuse2t64` (or `libfuse2`), `sudo dnf install fuse-libs`.
+
 ## Features
 
 **Map**
@@ -58,13 +75,14 @@ Requires Windows 10 or 11 (x64). Each release lists SHA-256 checksums for verifi
 - **Smart views:** largest files, duplicates (verified by content), files untouched for a year, caches & temp, dev artifacts.
 
 **Scan**
-- **Fast scan** reads the NTFS master file table directly, typically 10–20× faster than walking folders. It needs admin rights, and Strata offers to restart elevated and resume the scan.
+- **Fast scan** (Windows) reads the NTFS master file table directly, typically 10–20× faster than walking folders. It needs admin rights, and Strata offers to restart elevated and resume the scan.
 - A normal scan is also quick: it walks folders on several threads, and a 560k-file system drive takes seconds on an NVMe SSD.
+- On Linux, every mounted drive shows up (ext4, Btrfs, XFS, ZFS, NTFS, exFAT, network shares…). A scan stays on one file system, like `du -x`: other mounts, `/proc` and `/sys` aren't counted, hard links count once and sparse files count what they really use.
 - **Live progress:** a map that fills in as folders finish, the biggest files found so far, and pause / resume / cancel. You can explore partial results while the scan keeps going, and the map refreshes in place when it finishes.
 
 **Clean up**
-- **Suggestions with reasons:** Windows temp and update leftovers, browser and shader caches, crash dumps, old installers and disk images, large old media, duplicates, `node_modules` and other build output. Each one is marked *Safe* or *Review*.
-- **Safe by default:** everything goes to the Recycle Bin unless you choose otherwise, files in use are skipped, system locations are refused, and a 7-day **History** can restore what you removed.
+- **Suggestions with reasons:** Windows temp and update leftovers, browser and shader caches, crash dumps, old installers and disk images, large old media, duplicates, `node_modules` and other build output. On Linux also `~/.cache`, thumbnails, `/tmp`, core dumps and the APT, DNF, Pacman and Zypper package caches. Each one is marked *Safe* or *Review*.
+- **Safe by default:** everything goes to the Recycle Bin (the desktop Trash on Linux) unless you choose otherwise, files in use are skipped, system locations are refused, and a 7-day **History** can restore what you removed.
 
 **General**
 - **Private:** works entirely offline, with no account, telemetry or network access.
@@ -93,7 +111,7 @@ Requires Windows 10 or 11 (x64). Each release lists SHA-256 checksums for verifi
 
 1. **Pick something to map:** a drive card, *Choose a folder…*, or drag a folder onto the window.
 2. **Explore:** the biggest blocks are the biggest files. Double-click to dive into a folder, and use the breadcrumb or <kbd>Backspace</kbd> to come back.
-3. **Clean up:** use *Add to cleanup* on anything you select, or open **Clean up** in the header to review suggestions, then move them to the Recycle Bin.
+3. **Clean up:** use *Add to cleanup* on anything you select, or open **Clean up** in the header to review suggestions, then move them to the Recycle Bin (or Trash).
 
 ### Keyboard shortcuts
 
@@ -121,17 +139,19 @@ Search covers the folder you're zoomed into.
 
 | Option | What it does |
 |---|---|
-| **Fast scan (read the MFT)** | Reads the NTFS file table instead of listing folders. Needs administrator rights, and Strata offers to restart elevated. Falls back to a normal scan on other file systems. |
-| **Include hidden & system files** | Counts `pagefile.sys`, `hiberfil.sys`, `$Recycle.Bin`, hidden folders… |
+| **Fast scan (read the MFT)** | Windows only. Reads the NTFS file table instead of listing folders. Needs administrator rights, and Strata offers to restart elevated. Falls back to a normal scan on other file systems. |
+| **Include hidden & system files** | Counts `pagefile.sys`, `hiberfil.sys`, `$Recycle.Bin`, hidden folders… On Linux: dot-folders such as `~/.cache` and `~/.local`. |
 | **Follow junctions & symlinks** | Descends into links (with loop protection). Off by default so the same bytes aren't counted twice. |
+
+On Linux, Strata runs as your user, so folders you can't read (other users' homes, parts of `/var`) are marked and skipped, and system package caches need `sudo` to clean (each suggestion names the command).
 
 ## Safety
 
 Strata deletes files, so it's careful about it:
 
 - Nothing is deleted without a confirmation that lists what will go and how much space it frees.
-- The **Recycle Bin is the default**. Permanent deletion is an explicit opt-in.
-- Drive roots and core system folders (Windows, Program Files, ProgramData, user profile roots) are refused.
+- The **Recycle Bin is the default** (on Linux, the [freedesktop.org Trash](https://specifications.freedesktop.org/trash-spec/latest/) your file manager uses). Permanent deletion is an explicit opt-in.
+- Drive roots and core system folders (Windows, Program Files, ProgramData, user profile roots; on Linux `/usr`, `/etc`, `/var`, `/home`, your home folder, mount points…) are refused.
 - Temp and cache folders are **emptied, not removed**. Files in use are skipped and reported.
 - Junctions and symlinks are removed as links and never followed during deletion.
 - Duplicates are only pre-selected inside your personal folders (Downloads, Documents, Pictures…). Copies inside apps or tools are flagged *Review*.
@@ -139,7 +159,7 @@ Strata deletes files, so it's careful about it:
 
 ## Building from source
 
-Prerequisites: Windows 10/11, [Node.js](https://nodejs.org) 20 or newer (22+ for `npm run screenshots`), Git. No .NET SDK needed, because the scanner compiles with the C# compiler that ships with Windows (.NET Framework 4.x).
+Prerequisites: Windows 10/11 or Linux, [Node.js](https://nodejs.org) 20 or newer (22+ for `npm run screenshots`), Git. No .NET SDK needed: on Windows the scanner compiles with the C# compiler that ships with Windows (.NET Framework 4.x), and on Linux it's plain JavaScript run by Electron.
 
 ```bash
 git clone https://github.com/florentvdry/strata.git
@@ -154,6 +174,9 @@ npm start
 | `npm run build:scanner` | Compiles `scanner/StrataScan.cs` → `bin/StrataScan.exe` |
 | `npm run dist` | Builds the installer and portable `.exe` into `dist/` |
 | `npm run pack` | Builds an unpacked app into `dist/win-unpacked/` (quick to test) |
+| `npm run dist:linux` | Builds the AppImage, `.deb`, `.rpm`, `.pacman` and `.tar.gz` into `dist/` (the `.rpm` needs `rpmbuild`, the `.pacman` needs `bsdtar`) |
+| `npm run pack:linux` | Builds an unpacked Linux app into `dist/linux-unpacked/` |
+| `npm run test:scanner` | Runs the Linux scanner against a temporary folder tree |
 | `npm run screenshots` | Regenerates `docs/screenshots/` from a made-up drive |
 | `npm run build:icon` | Redraws `assets/icon.png` and `assets/icon.ico` |
 
@@ -164,7 +187,8 @@ npm start
 
 ```
 strata/
-├─ scanner/StrataScan.cs     Scanner: folder walk, NTFS MFT reader, duplicate finder, deletion
+├─ scanner/StrataScan.cs     Windows scanner: folder walk, NTFS MFT reader, duplicate finder, deletion
+├─ scanner/linux/            Linux scanner: same protocol, mounted drives, freedesktop.org Trash
 ├─ src/main/                 Electron main process: window, scanner processes, files, settings, history
 ├─ src/renderer/             UI, Preact + htm with no build step
 │  ├─ views/                 Start, Scanning, Explorer, Cleanup
@@ -183,6 +207,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit together
 |---|---|
 | Installed | `%APPDATA%\Strata` |
 | Portable | `Strata Data\` next to the `.exe` |
+| Linux | `~/.config/Strata` (or `$XDG_CONFIG_HOME/Strata`) |
 
 This folder holds the last 8 scans, settings and the 7-day cleanup history. Delete it to reset Strata.
 

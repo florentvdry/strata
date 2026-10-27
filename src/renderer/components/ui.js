@@ -3,6 +3,7 @@ import { useState, useEffect, useLayoutEffect } from 'preact/hooks';
 import { html } from '../lib/html.js';
 import { store, useStore, toast } from '../lib/store.js';
 import { fmtBytes, fmtWhen, plural, middleEllipsis } from '../lib/format.js';
+import { isWin, TRASH } from '../lib/platform.js';
 import * as A from '../actions.js';
 
 const api = window.strata;
@@ -59,8 +60,8 @@ function AdminDialog({ m }) {
 }
 
 function TrashDialog({ m }) {
-  return html`<${Dialog} title="Move to Recycle Bin?" onClose=${A.closeModal}>
-    <p>${m.isDir ? `The folder and its ${plural(m.files, 'file')} will be moved to the Recycle Bin.` : 'The file will be moved to the Recycle Bin.'} You can restore it from there or from Strata › History.</p>
+  return html`<${Dialog} title=${`Move to ${TRASH}?`} onClose=${A.closeModal}>
+    <p>${m.isDir ? `The folder and its ${plural(m.files, 'file')} will be moved to the ${TRASH}.` : `The file will be moved to the ${TRASH}.`} You can restore it from there or from Strata › History.</p>
     <div style="display: flex; flex-direction: column; gap: 4px; padding: 12px; border-radius: 10px; background: #0E1014; border: 1px solid #22262D">
       <span style="font-weight: 600; word-break: break-all">${m.name}</span>
       <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #9BA3AF; word-break: break-all">${m.path}</span>
@@ -68,15 +69,15 @@ function TrashDialog({ m }) {
     </div>
     <div class="actions">
       <button class="btn quiet" onClick=${A.closeModal}>Cancel</button>
-      <button class="btn danger" onClick=${() => A.trashNode(m.node)}>Move to Recycle Bin</button>
+      <button class="btn danger" onClick=${() => A.trashNode(m.node)}>Move to ${TRASH}</button>
     </div>
   <//>`;
 }
 
 function ConfirmCleanupDialog({ m }) {
   const shown = m.items.slice(0, 6);
-  return html`<${Dialog} title=${m.permanent ? `Delete ${plural(m.items.length, 'item')} permanently?` : `Move ${plural(m.items.length, 'item')} to the Recycle Bin?`} onClose=${A.closeModal}>
-    <p>${m.permanent ? html`This frees <b style="color:#E6E8EB">${fmtBytes(m.bytes)}</b> right away. <b style="color:#FF9AA2">It can't be undone.</b>` : html`This frees up to <b style="color:#E6E8EB">${fmtBytes(m.bytes)}</b> once you empty the Recycle Bin. Files in use are skipped.`}</p>
+  return html`<${Dialog} title=${m.permanent ? `Delete ${plural(m.items.length, 'item')} permanently?` : `Move ${plural(m.items.length, 'item')} to the ${TRASH}?`} onClose=${A.closeModal}>
+    <p>${m.permanent ? html`This frees <b style="color:#E6E8EB">${fmtBytes(m.bytes)}</b> right away. <b style="color:#FF9AA2">It can't be undone.</b>` : html`This frees up to <b style="color:#E6E8EB">${fmtBytes(m.bytes)}</b> once you empty the ${TRASH}. Files in use are skipped.`}</p>
     <div style="display: flex; flex-direction: column; border-radius: 10px; border: 1px solid #22262D; background: #0E1014">
       ${shown.map((it, k) => html`
         <div style=${`display: flex; gap: 12px; align-items: center; padding: 9px 12px; ${k < shown.length - 1 || m.items.length > 6 ? 'border-bottom: 1px solid #1B1F25' : ''}`}>
@@ -87,7 +88,7 @@ function ConfirmCleanupDialog({ m }) {
     </div>
     <div class="actions">
       <button class="btn quiet" onClick=${A.closeModal}>Cancel</button>
-      <button class=${m.permanent ? 'btn danger' : 'btn primary'} onClick=${() => A.runCleanup()}>${m.permanent ? 'Delete permanently' : 'Move to Recycle Bin'}</button>
+      <button class=${m.permanent ? 'btn danger' : 'btn primary'} onClick=${() => A.runCleanup()}>${m.permanent ? 'Delete permanently' : `Move to ${TRASH}`}</button>
     </div>
   <//>`;
 }
@@ -136,7 +137,7 @@ function SettingsDialog() {
         <input type="checkbox" checked=${settings.shading} onChange=${(e) => A.saveSettings({ shading: e.currentTarget.checked })} style="width: 18px; height: 18px; margin: 0" />
       </label>
     </section>
-    <section style="display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid #22262D">
+    ${isWin && html`<section style="display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid #22262D">
       <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #8C94A0">Permissions</span>
       <div style="display: flex; align-items: center; gap: 12px">
         <span style="flex: 1; display: flex; flex-direction: column; gap: 2px">
@@ -145,7 +146,7 @@ function SettingsDialog() {
         </span>
         ${!info.admin && html`<button class="btn" onClick=${() => A.relaunchAsAdmin(null)}>Restart as admin</button>`}
       </div>
-    </section>
+    </section>`}
     <section style="display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid #22262D">
       <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #8C94A0">Data</span>
       <div style="display: flex; align-items: center; gap: 12px">
@@ -179,7 +180,7 @@ function HistoryDialog() {
     load();
   }
   return html`<${Dialog} title="History" onClose=${A.closeModal} wide>
-    <p>What Strata removed in the last 7 days. Items in the Recycle Bin can be put back where they were.</p>
+    <p>What Strata removed in the last 7 days. Items in the ${TRASH} can be put back where they were.</p>
     <div style="display: flex; flex-direction: column; max-height: 52vh; overflow: auto; border-radius: 10px; border: 1px solid #22262D; background: #0E1014">
       ${list === null && html`<div style="padding: 16px; color: #9BA3AF; display: flex; gap: 10px; align-items: center"><span class="spinner"></span> Loading…</div>`}
       ${list && !list.length && html`<div style="padding: 16px; color: #9BA3AF">Nothing removed yet.</div>`}
@@ -188,7 +189,7 @@ function HistoryDialog() {
           <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
             <span style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">${h.name}${h.contentsOnly ? ' (contents)' : ''}</span>
             <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #9BA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">${h.path}</span>
-            <span style="font-size: 12px; color: #C9CED6">${fmtWhen(h.at)} · ${h.permanent ? 'Deleted permanently' : h.restored ? 'Restored' : 'Recycle Bin'}${h.ok ? '' : ' · partly'}</span>
+            <span style="font-size: 12px; color: #C9CED6">${fmtWhen(h.at)} · ${h.permanent ? 'Deleted permanently' : h.restored ? 'Restored' : TRASH}${h.ok ? '' : ' · partly'}</span>
           </span>
           <span style="font-family: 'Geist Mono', monospace; font-size: 12px">${fmtBytes(h.size)}</span>
           ${h.restorable ? html`<button class="btn" style="height: 32px; padding: 0 12px" disabled=${busy === h.id} onClick=${() => restore(h)}>${busy === h.id ? 'Restoring…' : 'Restore'}</button>` : html`<span style="width: 84px"></span>`}
