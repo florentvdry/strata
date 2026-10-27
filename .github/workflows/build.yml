@@ -3,9 +3,9 @@ name: Build
 on:
   push:
     branches: [main]
-    paths-ignore: ['website/**', 'docs/**', '**/*.md', '.github/workflows/website.yml', '.github/workflows/changelog.yml']
+    paths-ignore: ['website/**', 'docs/**', '.github/workflows/website.yml', '.github/workflows/changelog.yml']
   pull_request:
-    paths-ignore: ['website/**', 'docs/**', '**/*.md', '.github/workflows/website.yml', '.github/workflows/changelog.yml']
+    paths-ignore: ['website/**', 'docs/**', '.github/workflows/website.yml', '.github/workflows/changelog.yml']
   workflow_dispatch:
   # The Release workflow builds with the same jobs, with signing on.
   workflow_call:
