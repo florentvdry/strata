@@ -1,0 +1,52 @@
+[package]
+name = "strata-scan"
+version = "0.2.0"
+edition = "2024"
+description = "The disk-scanning helper behind Strata"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "strata-scan"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+md-5 = "0.10"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies.windows-sys]
+version = "0.61"
+features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_Storage_FileSystem",
+  "Win32_System_IO",
+  "Win32_System_Ioctl",
+  "Win32_System_SystemInformation",
+  "Win32_System_Threading",
+  "Win32_UI_Shell",
+]
+
+# musl's allocator takes a global lock; the scanner allocates from several threads at once.
+[target.'cfg(target_env = "musl")'.dependencies]
+mimalloc = { version = "0.1", default-features = false }
+
+[dev-dependencies]
+ruzstd = "0.8"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = true
+
+[lib]
+name = "strata_scan"
+path = "src/lib.rs"
+
+# cargo fuzz builds with --cfg fuzzing (see fuzz/).
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(fuzzing)"] }

@@ -1,4 +1,4 @@
-// File-type categories. Indices match FileTypes in scanner/StrataScan.cs and scanner/linux/strata-scan.js.
+// File-type categories. Indices match scanner/src/types.rs.
 export const TYPES = [
   { id: 'other',   c: '#7B8390', fg: '#0E1014', l: 'Other' },
   { id: 'video',   c: '#3B82F6', fg: '#071226', l: 'Video' },
@@ -15,7 +15,7 @@ export const T = Object.fromEntries(TYPES.map((t, i) => [t.id, i]));
 
 // Only used for display of names the scanner didn't classify (e.g. live "biggest so far").
 const EXT = {
-  video: 'mp4 mkv avi mov wmv webm m4v flv mpg mpeg ts m2ts vob',
+  video: 'mp4 mkv avi mov wmv webm m4v flv mpg mpeg m2ts vob',
   image: 'jpg jpeg png gif bmp tif tiff webp heic raw cr2 nef dng psd',
   archive: 'zip rar 7z tar gz iso img vhd vhdx vmdk msi cab',
   audio: 'mp3 wav flac aac ogg m4a wma opus',

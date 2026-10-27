@@ -1,0 +1,30 @@
+# Fuzzing the NTFS file-table reader: cargo +nightly fuzz run mft_record (from scanner/).
+[package]
+name = "strata-scan-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+strata-scan = { path = ".." }
+
+[[bin]]
+name = "mft_record"
+path = "fuzz_targets/mft_record.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "mft_volume"
+path = "fuzz_targets/mft_volume.rs"
+test = false
+doc = false
+bench = false
+
+# Not part of the scanner's workspace.
+[workspace]
