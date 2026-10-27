@@ -17,6 +17,8 @@ pub fn write_json(file: &Path, value: &Value) -> std::io::Result<()> {
 
 fn defaults(version: &str) -> Value {
     json!({
+        // "auto" follows the system language; otherwise a code from src/renderer/lib/i18n.js
+        "language": "auto",
         "accent": "#C6F432",
         "shading": true,
         "scan": { "mft": true, "hidden": true, "links": false },

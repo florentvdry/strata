@@ -2,7 +2,8 @@
 import { store, toast } from './lib/store.js';
 import { parseScan } from './lib/tree.js';
 import { buildSuggestions, userItem, dupeCandidates } from './lib/cleanup.js';
-import { fmtBytes, plural } from './lib/format.js';
+import { fmtBytes } from './lib/format.js';
+import { setLocale } from './lib/i18n.js';
 import { isWin, fold, isUnderPath, TRASH, FILE_MANAGER } from './lib/platform.js';
 import CHANGELOG from './lib/changelog-data.js';
 import { between } from './lib/changelog.js';
@@ -20,7 +21,8 @@ export async function init() {
   api.onDeleteProgress((p) => { if (s().modal && s().modal.kind === 'busy') store.set({ modal: { ...s().modal, ...p } }); });
   const [info, settings, recent] = await Promise.all([api.appInfo(), api.settings(), api.recent()]);
   applyAccent(settings.accent);
-  store.set({ info, settings, recent, ready: true });
+  const locale = await setLocale(settings.language);
+  store.set({ info, settings, recent, locale, ready: true });
   await refreshDrives();
   const pending = await api.pendingScan();
   if (pending) { startScan(pending.root, pending.options); return; }
@@ -34,7 +36,8 @@ export function applyAccent(c) {
 export async function saveSettings(patch) {
   const settings = await api.saveSettings(patch);
   if (patch.accent) applyAccent(settings.accent);
-  store.set({ settings });
+  const locale = patch.language ? await setLocale(settings.language) : s().locale;
+  store.set({ settings, locale });
 }
 
 export function setScanOption(key, value) {

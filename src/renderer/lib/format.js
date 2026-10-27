@@ -1,3 +1,5 @@
+import { t, getLocale, fmtNum } from './i18n.js';
+
 // Number, size and date formatting. Sizes use 1024-based units, labelled like Windows and most Linux file managers do (GB, TB).
 const UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
 
@@ -10,19 +12,22 @@ export function bytesParts(b, digits) {
   return { num: b.toFixed(d), unit: UNITS[u] };
 }
 
+// Decimal separator of the current language ("1.5" → "1,5").
+const localNum = (str) => (str.includes('.') ? str.replace('.', fmtNum(1.1)[1]) : str);
+
 export function fmtBytes(b, digits) {
   const p = bytesParts(b, digits);
-  return `${p.num} ${p.unit}`;
+  return `${localNum(p.num)} ${p.unit}`;
 }
 
 // Same unit as `ref`, e.g. "381.2 / 476 GB".
 export function fmtPair(a, total) {
   const p = bytesParts(total);
   const div = 1024 ** UNITS.indexOf(p.unit);
-  return `${(a / div).toFixed(p.unit === 'TB' ? 2 : 1).replace(/\.0+$/, '')} / ${p.num.replace(/\.0+$/, '')} ${p.unit}`;
+  return localNum(`${(a / div).toFixed(p.unit === 'TB' ? 2 : 1).replace(/\.0+$/, '')} / ${p.num.replace(/\.0+$/, '')} ${p.unit}`);
 }
 
-export const fmtCount = (n) => Math.round(n).toLocaleString('en-US');
+export const fmtCount = (n) => fmtNum(Math.round(n));
 
 export function fmtShort(n) {
   if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e7 ? 1 : 2).replace(/\.?0+$/, '') + 'M';
@@ -44,45 +49,40 @@ export function fmtDur(sec) {
 }
 
 export function fmtEta(sec) {
-  if (!isFinite(sec) || sec < 0) return 'Estimating time left…';
-  if (sec < 5) return 'Almost done…';
-  if (sec < 60) return `About ${Math.round(sec / 5) * 5 || 5} seconds left`;
+  if (!isFinite(sec) || sec < 0) return t('Estimating time left…');
+  if (sec < 5) return t('Almost done…');
+  if (sec < 60) return t('About {n, plural, one {# second} other {# seconds}} left', { n: Math.round(sec / 5) * 5 || 5 });
   const m = Math.round(sec / 60);
-  return m === 1 ? 'About a minute left' : `About ${m} minutes left`;
+  return m === 1 ? t('About a minute left') : t('About {n} minutes left', { n: m });
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const LONG_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const dateFmt = (opts) => new Intl.DateTimeFormat(getLocale(), opts);
 
 export function fmtWhen(ms) {
   const d = new Date(ms), now = new Date();
-  const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const diff = Math.round((day(now) - day(d)) / 864e5);
-  if (diff === 0) return `Today ${time}`;
-  if (diff === 1) return 'Yesterday';
-  if (d.getFullYear() === now.getFullYear()) return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
-  return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+  if (diff === 0) return t('Today {time}', { time: dateFmt({ hour: '2-digit', minute: '2-digit' }).format(d) });
+  if (diff === 1) return t('Yesterday');
+  if (d.getFullYear() === now.getFullYear()) return dateFmt({ month: 'short', day: 'numeric' }).format(d);
+  return dateFmt({ month: 'short', day: 'numeric', year: 'numeric' }).format(d);
 }
 
 export function fmtAgo(unixSec) {
-  if (!unixSec) return 'a while ago';
+  if (!unixSec) return t('a while ago');
   const days = (Date.now() / 1000 - unixSec) / 86400;
-  if (days < 1) return 'today';
-  if (days < 2) return 'yesterday';
-  if (days < 14) return `${Math.floor(days)} days ago`;
-  if (days < 60) return `${Math.floor(days / 7)} weeks ago`;
-  if (days < 365) return `${Math.floor(days / 30)} months ago`;
-  const y = Math.floor(days / 365);
-  return y === 1 ? 'a year ago' : `${y} years ago`;
+  if (days < 1) return t('today');
+  if (days < 2) return t('yesterday');
+  if (days < 14) return t('{n, plural, one {# day} other {# days}} ago', { n: Math.floor(days) });
+  if (days < 60) return t('{n, plural, one {# week} other {# weeks}} ago', { n: Math.floor(days / 7) });
+  if (days < 365) return t('{n, plural, one {# month} other {# months}} ago', { n: Math.floor(days / 30) });
+  return t('{n, plural, one {# year} other {# years}} ago', { n: Math.floor(days / 365) });
 }
 
 export function fmtMonth(unixSec) {
   const d = new Date(unixSec * 1000);
-  const now = new Date();
-  return d.getFullYear() === now.getFullYear() ? LONG_MONTHS[d.getMonth()] : `${LONG_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+  return d.getFullYear() === new Date().getFullYear() ? dateFmt({ month: 'long' }).format(d) : dateFmt({ month: 'long', year: 'numeric' }).format(d);
 }
-
 // "C:\Users\alex\AppData\Local\Packages\…\LocalCache\Roaming\cache_0042.bin"
 export function middleEllipsis(p, max = 96) {
   if (!p || p.length <= max) return p || '';
@@ -93,5 +93,3 @@ export function middleEllipsis(p, max = 96) {
   while (s.length > max && head.length > 2) { head = head.slice(0, -1); s = [...head, '…', ...tail].join(sep); }
   return s.length > max ? '…' + p.slice(-(max - 1)) : s;
 }
-
-export function plural(n, one, many) { return `${fmtCount(n)} ${n === 1 ? one : (many || one + 's')}`; }

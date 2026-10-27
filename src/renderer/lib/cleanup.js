@@ -1,17 +1,18 @@
 // Cleanup suggestions derived from a scan.
 import { F_DIR, F_REPARSE } from './tree.js';
 import { T } from './types.js';
-import { fmtShort, fmtAgo, fmtMonth, plural } from './format.js';
+import { fmtShort, fmtAgo, fmtMonth } from './format.js';
+import { t } from './i18n.js';
 import { isWin, sep, fold, parentPath } from './platform.js';
 
 export const CATS = [
-  { id: 'all', label: 'Everything', hint: 'All suggestions, safest first', dot: 'var(--accent)' },
-  { id: 'cache', label: 'Caches & temp', hint: 'Regenerated automatically — safe to remove', dot: '#5B6576', short: 'Temp & caches' },
-  { id: 'installer', label: 'Old installers', hint: 'Setup files and disk images you already used', dot: '#A78BFA', short: 'Old installers' },
-  { id: 'dupe', label: 'Duplicates', hint: 'Byte-identical copies, one copy is kept', dot: '#F59E0B', short: 'Duplicates' },
-  { id: 'media', label: 'Large & old media', hint: 'Big files you haven’t opened in a while', dot: '#3B82F6', short: 'Large & old media' },
-  { id: 'dev', label: 'Dev artifacts', hint: 'Dependencies and build output you can restore', dot: '#34D399', short: 'Dev artifacts' },
-  { id: 'user', label: 'Added by you', hint: 'Things you picked on the map', dot: '#EC6FB0', short: 'Added by you' },
+  { id: 'all', get label() { return t('Everything'); }, get hint() { return t('All suggestions, safest first'); }, dot: 'var(--accent)' },
+  { id: 'cache', get label() { return t('Caches & temp'); }, get hint() { return t('Regenerated automatically — safe to remove'); }, dot: '#5B6576', get short() { return t('Temp & caches'); } },
+  { id: 'installer', get label() { return t('Old installers'); }, get hint() { return t('Setup files and disk images you already used'); }, dot: '#A78BFA', get short() { return t('Old installers'); } },
+  { id: 'dupe', get label() { return t('Duplicates'); }, get hint() { return t('Byte-identical copies, one copy is kept'); }, dot: '#F59E0B', get short() { return t('Duplicates'); } },
+  { id: 'media', get label() { return t('Large & old media'); }, get hint() { return t('Big files you haven’t opened in a while'); }, dot: '#3B82F6', get short() { return t('Large & old media'); } },
+  { id: 'dev', get label() { return t('Dev artifacts'); }, get hint() { return t('Dependencies and build output you can restore'); }, dot: '#34D399', get short() { return t('Dev artifacts'); } },
+  { id: 'user', get label() { return t('Added by you'); }, get hint() { return t('Things you picked on the map'); }, dot: '#EC6FB0', get short() { return t('Added by you'); } },
 ];
 
 const DAY = 86400;
@@ -106,34 +107,34 @@ export function buildSuggestions(tree, env, dupes) {
 
     // ── caches & temp ──
     if (nm === 'temp' && pn === 'local' && gp === 'appdata') {
-      single('cache', i, 'Windows temp files', ageReason(tree, i, 'opened'), 'safe', { contentsOnly: true });
+      single('cache', i, t('Windows temp files'), ageReason(tree, i, 'opened'), 'safe', { contentsOnly: true });
       continue;
     }
     if (nm === 'temp' && pn === 'windows') {
-      single('cache', i, 'System temp files', ageReason(tree, i, 'touched'), 'safe', { contentsOnly: true });
+      single('cache', i, t('System temp files'), ageReason(tree, i, 'touched'), 'safe', { contentsOnly: true });
       continue;
     }
     if (nm === 'download' && pn === 'softwaredistribution') {
-      single('cache', i, 'Windows Update leftovers', 'Installed updates already applied', 'safe', { contentsOnly: true });
+      single('cache', i, t('Windows Update leftovers'), t('Installed updates already applied'), 'safe', { contentsOnly: true });
       continue;
     }
     if (nm === 'cache' && pn === 'deliveryoptimization') {
-      single('cache', i, 'Delivery Optimization files', 'Update files shared with other PCs', 'safe', { contentsOnly: true });
+      single('cache', i, t('Delivery Optimization files'), t('Update files shared with other PCs'), 'safe', { contentsOnly: true });
       continue;
     }
     if ((nm === 'crashdumps' && pn === 'local') || (nm === 'minidump' && pn === 'windows') || ((nm === 'reportarchive' || nm === 'reportqueue') && pn === 'wer')) {
-      group('crash', () => ({ id: 'cache:crash', cat: 'cache', name: 'Crash dumps & error reports', reason: 'Only useful for debugging crashes', risk: 'safe', contentsOnly: true }), i);
+      group('crash', () => ({ id: 'cache:crash', cat: 'cache', name: t('Crash dumps & error reports'), reason: t('Only useful for debugging crashes'), risk: 'safe', contentsOnly: true }), i);
       continue;
     }
     if (BROWSER_CACHE.has(nm)) {
       const lp = lpath(i);
       if (BROWSERS.some((b) => lp.includes(b))) {
-        group('browser', () => ({ id: 'cache:browser', cat: 'cache', name: 'Browser caches', reason: 'Close browsers before cleaning', risk: 'safe', contentsOnly: true }), i);
+        group('browser', () => ({ id: 'cache:browser', cat: 'cache', name: t('Browser caches'), reason: t('Close browsers before cleaning'), risk: 'safe', contentsOnly: true }), i);
         continue;
       }
     }
     if ((nm === 'd3dscache' && pn === 'local') || ((nm === 'dxcache' || nm === 'glcache' || nm === 'dxccache' || nm === 'vkcache' || nm === 'optixcache') && (pn === 'nvidia' || pn === 'amd' || pn === 'nv_cache')) || (nm === 'shadercache' && (pn === 'intel' || pn === 'steamapps')) || (nm === 'shadercache' && pn === 'steam')) {
-      group('shader', () => ({ id: 'cache:shader', cat: 'cache', name: 'Shader caches', reason: 'Rebuilt automatically on next launch', risk: 'safe', contentsOnly: true }), i);
+      group('shader', () => ({ id: 'cache:shader', cat: 'cache', name: t('Shader caches'), reason: t('Rebuilt automatically on next launch'), risk: 'safe', contentsOnly: true }), i);
       continue;
     }
     if (!isWin) {
@@ -143,7 +144,7 @@ export function buildSuggestions(tree, env, dupes) {
         continue;
       }
       if (ap === '/var/lib/systemd/coredump' || ap === '/var/crash') {
-        group('crash', () => ({ id: 'cache:crash', cat: 'cache', name: 'Crash dumps & error reports', reason: 'Only useful for debugging crashes', risk: 'safe', contentsOnly: true }), i);
+        group('crash', () => ({ id: 'cache:crash', cat: 'cache', name: t('Crash dumps & error reports'), reason: t('Only useful for debugging crashes'), risk: 'safe', contentsOnly: true }), i);
         continue;
       }
       const pkg = PKG_CACHES.find((c) => c[0] === ap);
@@ -152,7 +153,7 @@ export function buildSuggestions(tree, env, dupes) {
         continue;
       }
       if (ap === homeCache + '/thumbnails') {
-        single('cache', i, 'Thumbnail cache', 'Previews your file manager rebuilds as needed', 'safe', { contentsOnly: true });
+        single('cache', i, t('Thumbnail cache'), t('Previews your file manager rebuilds as needed'), 'safe', { contentsOnly: true });
         continue;
       }
       if (parentPath(ap) === homeCache && !LINUX_CACHE_SKIP.test(nm) && size[i] >= 64 * 1024 ** 2) {
@@ -164,37 +165,37 @@ export function buildSuggestions(tree, env, dupes) {
     // ── dev artifacts ──
     if (!inProject) {
       const pkg = packageCache(nm, pn, gp);
-      if (pkg && !sys[p]) single('dev', i, pkg, 'Package downloads, fetched again when needed', 'review', { contentsOnly: true });
+      if (pkg && !sys[p]) single('dev', i, pkg, t('Package downloads, fetched again when needed'), 'review', { contentsOnly: true });
       else if (appdata[i] && !sys[i] && GENERIC_CACHE.has(nm) && size[i] >= 64 * 1024 ** 2) genericCaches.push(i);
       continue;
     }
     if (nm === 'node_modules') {
-      group('node_modules', () => ({ id: 'dev:node_modules', cat: 'dev', name: 'node_modules', reason: 'Reinstall with your package manager', risk: 'review' }), i);
+      group('node_modules', () => ({ id: 'dev:node_modules', cat: 'dev', name: t('node_modules'), reason: t('Reinstall with your package manager'), risk: 'review' }), i);
       continue;
     }
     if (nm === '__pycache__') {
-      group('pycache', () => ({ id: 'dev:pycache', cat: 'dev', name: '__pycache__', reason: 'Recreated automatically by Python', risk: 'review' }), i);
+      group('pycache', () => ({ id: 'dev:pycache', cat: 'dev', name: t('__pycache__'), reason: t('Recreated automatically by Python'), risk: 'review' }), i);
       continue;
     }
     if (nm === 'target' && hasChild(p, /^cargo\.toml$/i)) {
-      group('rust', () => ({ id: 'dev:rust', cat: 'dev', name: 'Rust build output', reason: 'Rebuilt by cargo build', risk: 'review' }), i);
+      group('rust', () => ({ id: 'dev:rust', cat: 'dev', name: t('Rust build output'), reason: t('Rebuilt by cargo build'), risk: 'review' }), i);
       continue;
     }
     if ((nm === 'obj' || nm === 'bin') && hasChild(p, /\.(cs|fs|vb)proj$/i)) {
-      group('dotnet', () => ({ id: 'dev:dotnet', cat: 'dev', name: '.NET build output', reason: 'Rebuilt by dotnet build', risk: 'review' }), i);
+      group('dotnet', () => ({ id: 'dev:dotnet', cat: 'dev', name: t('.NET build output'), reason: t('Rebuilt by dotnet build'), risk: 'review' }), i);
       continue;
     }
     if (FRAMEWORK_CACHE.has(nm)) {
-      group('fw', () => ({ id: 'dev:framework', cat: 'dev', name: 'Framework build caches', reason: 'Rebuilt on next build', risk: 'review' }), i);
+      group('fw', () => ({ id: 'dev:framework', cat: 'dev', name: t('Framework build caches'), reason: t('Rebuilt on next build'), risk: 'review' }), i);
       continue;
     }
     if ((nm === '.venv' || nm === 'venv') && hasChild(i, /^pyvenv\.cfg$/i)) {
-      group('venv', () => ({ id: 'dev:venv', cat: 'dev', name: 'Python virtual environments', reason: 'Recreate with pip install -r requirements.txt', risk: 'review' }), i);
+      group('venv', () => ({ id: 'dev:venv', cat: 'dev', name: t('Python virtual environments'), reason: t('Recreate with pip install -r requirements.txt'), risk: 'review' }), i);
       continue;
     }
     const pkgCache = packageCache(nm, pn, gp);
     if (pkgCache) {
-      single('dev', i, pkgCache, 'Package downloads, fetched again when needed', 'review', { contentsOnly: true });
+      single('dev', i, pkgCache, t('Package downloads, fetched again when needed'), 'review', { contentsOnly: true });
       continue;
     }
   }
@@ -235,7 +236,7 @@ export function buildSuggestions(tree, env, dupes) {
   media.sort((a, b) => size[b] - size[a]);
   for (const i of media.slice(0, 25)) {
     const age = t - tree.mtime[i];
-    if (i === largest) single('media', i, names[i], 'Largest file on the drive', 'review');
+    if (i === largest) single('media', i, names[i], t('Largest file on the drive'), 'review');
     else if (age > 90 * DAY) single('media', i, names[i], `Not modified since ${fmtMonth(tree.mtime[i])}`, 'review');
     else if (size[i] >= 2 * 1024 ** 3) single('media', i, names[i], `${(size[i] / 1024 ** 3).toFixed(1)} GB in a single file`, 'review');
   }
