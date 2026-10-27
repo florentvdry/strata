@@ -36,7 +36,7 @@ features = [
 mimalloc = { version = "0.1", default-features = false }
 
 [dev-dependencies]
-ruzstd = "0.8"
+ruzstd = "0.9"
 
 [profile.release]
 lto = "fat"
