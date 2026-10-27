@@ -45,7 +45,7 @@ jobs:
         with:
           workspaces: |
             scanner
-            src-tauri
+            src/app
 
       - name: Install dependencies
         run: npm ci
@@ -78,7 +78,7 @@ jobs:
         run: node scripts/check-fast-scan.js --bench
 
       - name: App format, lints and unit tests
-        working-directory: src-tauri
+        working-directory: src/app
         run: |
           cargo fmt --check
           cargo clippy --locked --all-targets -- -D warnings
@@ -86,7 +86,7 @@ jobs:
 
       - name: Build the installer
         run: npx tauri build --bundles nsis ${{ env.TAURI_RELEASE_CONFIG }}
-        working-directory: src-tauri
+        working-directory: src/app
 
       - name: Smoke test the built app
         run: node scripts/smoke-test.js
@@ -126,7 +126,7 @@ jobs:
         with:
           workspaces: |
             scanner
-            src-tauri
+            src/app
 
       # WebKitGTK and GTK for the app (built on 22.04 so it runs on 22.04 and newer), musl-tools for the scanner,
       # ntfs-3g and zstd for fresh NTFS test images and the pacman package, xvfb for the smoke test.
@@ -168,7 +168,7 @@ jobs:
         run: npm run test:scanner
 
       - name: App format, lints and unit tests
-        working-directory: src-tauri
+        working-directory: src/app
         run: |
           cargo fmt --check
           cargo clippy --locked --all-targets -- -D warnings
@@ -178,9 +178,9 @@ jobs:
       - name: Build deb, rpm and AppImage
         run: |
           bundles=deb,rpm,appimage
-          case "$(node -p "require('../package.json').version")" in *-*) bundles=deb,appimage ;; esac
+          case "$(node -p "require('../../package.json').version")" in *-*) bundles=deb,appimage ;; esac
           npx tauri build --bundles "$bundles" ${{ env.TAURI_RELEASE_CONFIG }}
-        working-directory: src-tauri
+        working-directory: src/app
 
       - name: Smoke test the built app
         run: xvfb-run -a node scripts/smoke-test.js

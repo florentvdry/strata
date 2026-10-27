@@ -8,6 +8,11 @@ edition = "2024"
 publish = false
 default-run = "strata"
 
+# The Rust files sit next to Cargo.toml: this app lives in src/app, next to the UI in src/renderer.
+[[bin]]
+name = "strata"
+path = "main.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

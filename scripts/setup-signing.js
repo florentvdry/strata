@@ -9,7 +9,7 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 
 const root = path.join(__dirname, '..');
-const conf = path.join(root, 'src-tauri', 'tauri.conf.json');
+const conf = path.join(root, 'src', 'app', 'tauri.conf.json');
 const text = fs.readFileSync(conf, 'utf8');
 const current = JSON.parse(text).plugins.updater.pubkey;
 if (!current.startsWith('REPLACE') && !process.argv.includes('--force')) {
@@ -24,7 +24,7 @@ const pub = fs.readFileSync(`${key}.pub`, 'utf8').trim();
 const priv = fs.readFileSync(key, 'utf8').trim();
 fs.writeFileSync(conf, text.replace(current, pub));
 fs.rmSync(dir, { recursive: true, force: true });
-console.log(`Public key written to src-tauri/tauri.conf.json. Commit it.
+console.log(`Public key written to src/app/tauri.conf.json. Commit it.
 
 Now store the PRIVATE key as a GitHub Actions secret named TAURI_SIGNING_PRIVATE_KEY (Settings › Secrets and variables › Actions),
 and keep a copy somewhere safe (a password manager). It is shown once:

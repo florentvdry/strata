@@ -12,7 +12,7 @@ const { execFileSync } = require('child_process');
 
 const root = path.join(__dirname, '..');
 const version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
-const target = path.join(root, 'src-tauri', 'target', 'release');
+const target = path.join(root, 'src', 'app', 'target', 'release');
 const bundle = path.join(target, 'bundle');
 const out = path.join(root, 'dist');
 const IS_WIN = process.platform === 'win32';
@@ -69,7 +69,7 @@ function pacman(binary) {
     fs.chmodSync(to, mode);
   };
   put0('usr/bin/strata', binary, 0o755);
-  put0('usr/share/icons/hicolor/128x128/apps/strata.png', path.join(root, 'src-tauri', 'icons', '128x128.png'), 0o644);
+  put0('usr/share/icons/hicolor/128x128/apps/strata.png', path.join(root, 'src', 'app', 'icons', '128x128.png'), 0o644);
   put0('usr/share/licenses/strata/LICENSE', path.join(root, 'LICENSE'), 0o644);
   fs.mkdirSync(path.join(stage, 'usr/share/applications'), { recursive: true });
   fs.writeFileSync(path.join(stage, 'usr/share/applications/strata.desktop'), desktopFile());
@@ -98,7 +98,7 @@ function tarball(binary) {
   fs.copyFileSync(binary, path.join(stage, 'strata'));
   fs.chmodSync(path.join(stage, 'strata'), 0o755);
   fs.copyFileSync(path.join(root, 'LICENSE'), path.join(stage, 'LICENSE'));
-  fs.copyFileSync(path.join(root, 'src-tauri', 'icons', '128x128.png'), path.join(stage, 'strata.png'));
+  fs.copyFileSync(path.join(root, 'src', 'app', 'icons', '128x128.png'), path.join(stage, 'strata.png'));
   fs.writeFileSync(path.join(stage, 'strata.desktop'), desktopFile());
   const file = path.join(out, `Strata-${version}-x64.tar.gz`);
   execFileSync('tar', ['--owner=0', '--group=0', '--numeric-owner', '-czf', file, '-C', stage, 'strata', 'LICENSE', 'strata.png', 'strata.desktop'], { stdio: 'inherit' });

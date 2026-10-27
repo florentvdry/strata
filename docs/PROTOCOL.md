@@ -1,6 +1,6 @@
 # Scanner protocol
 
-The contract between the app (`src-tauri/`) and the scanner (`strata-scan`, built from [`scanner/`](../scanner)). The UI never talks to the scanner directly.
+The contract between the app (`src/app/`) and the scanner (`strata-scan`, built from [`scanner/`](../scanner)). The UI never talks to the scanner directly.
 
 - The app starts one scanner process per job: `strata-scan <command> [arguments]`.
 - The scanner writes **one JSON object per line** on stdout. Every message has a `type`.

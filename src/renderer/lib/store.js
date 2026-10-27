@@ -33,7 +33,7 @@ export const store = createStore({
   cleanup: { items: [], on: {}, user: [], cat: 'all', permanent: false },
   modal: null,
   menu: null, // the right-click menu: { x, y, items, resolve }
-  update: null, // what the updater is doing (see src-tauri/src/updates.rs)
+  update: null, // what the updater is doing (see src/app/updates.rs)
   toast: null,
   dragging: false,
 });

@@ -37,7 +37,7 @@ jobs:
 
       - name: Update signing is set up
         run: |
-          if grep -q '"pubkey": "REPLACE' src-tauri/tauri.conf.json; then
+          if grep -q '"pubkey": "REPLACE' src/app/tauri.conf.json; then
             echo "::error::No update signing key yet. Run: npm run signing:setup (see docs/RELEASING.md)"
             exit 1
           fi

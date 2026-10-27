@@ -21,7 +21,7 @@ jobs:
       - name: CHANGELOG.md is part of the change
         run: |
           changed=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
-          if echo "$changed" | grep -qE '^(src/|scanner/src/|src-tauri/src/)'; then
+          if echo "$changed" | grep -qE '^(src/|scanner/src/)'; then
             if ! echo "$changed" | grep -qx 'CHANGELOG.md'; then
               echo "::error::This changes the app or the scanner but not CHANGELOG.md. Add a line under [Unreleased] (or label the PR no-changelog)."
               exit 1

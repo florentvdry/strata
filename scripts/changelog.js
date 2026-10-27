@@ -30,8 +30,8 @@ function generatedModule(L, releases) {
 
 function versions() {
   const pkg = JSON.parse(read('package.json')).version;
-  const cargo = /^version\s*=\s*"([^"]+)"/m.exec(read('src-tauri', 'Cargo.toml').split('[dependencies]')[0])[1];
-  const lock = /name = "strata"\r?\nversion = "([^"]+)"/.exec(read('src-tauri', 'Cargo.lock'));
+  const cargo = /^version\s*=\s*"([^"]+)"/m.exec(read('src', 'app', 'Cargo.toml').split('[dependencies]')[0])[1];
+  const lock = /name = "strata"\r?\nversion = "([^"]+)"/.exec(read('src', 'app', 'Cargo.lock'));
   return { pkg, cargo, lock: lock && lock[1] };
 }
 
@@ -54,8 +54,8 @@ async function check() {
   if (unreleased && !/^\[Unreleased\]: https?:\/\//m.test(md)) problems.push('Missing the "[Unreleased]: https://…" link line at the bottom.');
 
   const v = versions();
-  if (v.pkg !== v.cargo) problems.push(`package.json (${v.pkg}) and src-tauri/Cargo.toml (${v.cargo}) have different versions.`);
-  if (v.lock && v.lock !== v.cargo) problems.push(`src-tauri/Cargo.lock says ${v.lock}; run cargo update -p strata or \`npm run release\`.`);
+  if (v.pkg !== v.cargo) problems.push(`package.json (${v.pkg}) and src/app/Cargo.toml (${v.cargo}) have different versions.`);
+  if (v.lock && v.lock !== v.cargo) problems.push(`src/app/Cargo.lock says ${v.lock}; run cargo update -p strata or \`npm run release\`.`);
   if (releases[0] && L.compareVersions(v.pkg, releases[0].version) < 0) problems.push(`package.json (${v.pkg}) is older than the newest changelog entry (${releases[0].version}).`);
 
   const expected = generatedModule(L, releases);
@@ -91,10 +91,10 @@ function bump(version) {
   lock.version = version;
   if (lock.packages && lock.packages['']) lock.packages[''].version = version;
   write('package-lock.json', `${JSON.stringify(lock, null, 2)}\n`);
-  const cargo = read('src-tauri', 'Cargo.toml');
+  const cargo = read('src', 'app', 'Cargo.toml');
   const head = cargo.slice(0, cargo.indexOf('[build-dependencies]'));
-  write('src-tauri/Cargo.toml', cargo.replace(head, head.replace(/^(version\s*=\s*")[^"]+(")/m, `$1${version}$2`)));
-  sub('src-tauri/Cargo.lock', /(name = "strata"\r?\nversion = ")[^"]+(")/, `$1${version}$2`);
+  write('src/app/Cargo.toml', cargo.replace(head, head.replace(/^(version\s*=\s*")[^"]+(")/m, `$1${version}$2`)));
+  sub('src/app/Cargo.lock', /(name = "strata"\r?\nversion = ")[^"]+(")/, `$1${version}$2`);
 }
 
 async function release(version, dateArg) {

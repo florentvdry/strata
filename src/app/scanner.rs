@@ -1,4 +1,4 @@
-//! The scanner process (strata-scan, built from ../scanner): where it lives and how it is run.
+//! The scanner process (strata-scan, built from /scanner): where it lives and how it is run.
 //! The protocol is in docs/PROTOCOL.md: one JSON object per stdout line, plain-text commands on stdin.
 use serde_json::Value;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -14,7 +14,8 @@ static EMBEDDED: &[u8] = include_bytes!(env!("STRATA_SCANNER_EMBEDDED"));
 /// (a new version), so the file next to the user's data always matches this build.
 pub fn ensure(data_dir: &Path) -> Result<PathBuf, String> {
     if EMBEDDED.is_empty() {
-        let dev = Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("bin").join(platform::scanner_name());
+        let dev =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("..").join("bin").join(platform::scanner_name());
         return if dev.exists() { Ok(dev) } else { Err("The scanner is missing. Run `npm run build:scanner`.".into()) };
     }
     let mut last = String::new();

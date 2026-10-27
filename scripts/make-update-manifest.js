@@ -3,7 +3,7 @@
 //   node scripts/make-update-manifest.js --notes-file notes.md [--dir dist]
 //
 // Keys follow the updater's naming: <os>-<arch>-<how it was installed>. The app asks for the one that matches
-// how it runs (see src-tauri/src/updates.rs); `windows-x86_64` and `linux-x86_64` are what builds that can't
+// how it runs (see src/app/updates.rs); `windows-x86_64` and `linux-x86_64` are what builds that can't
 // update themselves (tar.gz, pacman) look up, to learn there is a new version.
 const crypto = require('crypto');
 const fs = require('fs');

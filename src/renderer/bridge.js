@@ -1,4 +1,4 @@
-// Bridge between the UI and the app (src-tauri/): window.strata, one call per app command.
+// Bridge between the UI and the app (src/app/): window.strata, one call per app command.
 // Loaded before the UI's modules. When window.strata already exists (screenshots, tests) it stays as it is.
 (function () {
   if (window.strata) return;

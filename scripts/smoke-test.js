@@ -8,7 +8,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 const root = path.join(__dirname, '..');
-const exe = process.argv[2] || path.join(root, 'src-tauri', 'target', 'release', process.platform === 'win32' ? 'strata.exe' : 'strata');
+const exe = process.argv[2] || path.join(root, 'src', 'app', 'target', 'release', process.platform === 'win32' ? 'strata.exe' : 'strata');
 if (!fs.existsSync(exe)) { console.error(`No executable at ${exe}`); process.exit(1); }
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'strata-smoke-'));

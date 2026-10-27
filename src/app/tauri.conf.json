@@ -3,7 +3,7 @@
   "productName": "Strata",
   "identifier": "io.github.florentvdry.strata",
   "build": {
-    "frontendDist": "../src/renderer"
+    "frontendDist": "../renderer"
   },
   "app": {
     "withGlobalTauri": true,
@@ -30,7 +30,7 @@
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
     "copyright": "Copyright © 2026 Florent Vandroy",
     "license": "MIT",
-    "licenseFile": "../LICENSE",
+    "licenseFile": "../../LICENSE",
     "category": "Utility",
     "shortDescription": "See what fills your disk, then clean it up",
     "longDescription": "A fast, modern disk space analyzer for Windows and Linux: maps every file as a block sized by its bytes, suggests safe cleanups and sends them to the Recycle Bin or Trash.",

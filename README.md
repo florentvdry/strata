@@ -207,7 +207,7 @@ strata/
 │  ├─ src/platform/          What differs between Windows and Linux
 │  ├─ tests/fixtures/        NTFS disk images for the fast-scan tests
 │  └─ fuzz/                  Fuzz targets for the NTFS reader
-├─ src-tauri/                The app (Tauri, Rust): window, scanner processes, files, settings, history, updates
+├─ src/app/                  The app (Tauri, Rust): window, scanner processes, files, settings, history, updates
 ├─ src/renderer/             UI, Preact + htm with no build step
 │  ├─ views/                 Start, Scanning, Explorer, Cleanup
 │  ├─ components/            Space map (treemap, sunburst, columns), dialogs, icons

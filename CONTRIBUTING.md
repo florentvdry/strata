@@ -33,9 +33,9 @@ npm start
 | `scanner/src/` | The scanner process (Rust): protocol, scan file, folder walk, duplicate finder, deletion. |
 | `scanner/src/platform/` | What differs between Windows and Linux: folder listing, drives, Recycle Bin / Trash. |
 | `scanner/src/mft/` | The NTFS fast scan (Windows), tested on disk images in `scanner/tests/fixtures/`. |
-| `src-tauri/src/platform.rs` | Wording and protected locations that differ between Windows and Linux in the app. |
+| `src/app/platform.rs` | Wording and protected locations that differ between Windows and Linux in the app. |
 | `src/renderer/lib/platform.js` | Path separator, case-sensitivity and wording that differ between Windows and Linux. |
-| `src-tauri/src/` | The app (Rust): window, spawning the scanner, files, settings, history, updates. `commands.rs` has one command per `window.strata` call. |
+| `src/app/` | The app (Rust): window, spawning the scanner, files, settings, history, updates. `commands.rs` has one command per `window.strata` call. |
 | `src/renderer/bridge.js` | The only bridge between the UI and the system (`window.strata`). |
 | `scripts/changelog.js`, `scripts/package-release.js` | Release tooling: see [docs/RELEASING.md](docs/RELEASING.md). |
 | `src/renderer/views/` | The four screens: Start, Scanning, Explorer, Cleanup. |
@@ -54,7 +54,7 @@ npm start
 - **Scanner code must not panic on bad input.** Everything read from the disk is bounds-checked. Run `cargo fmt`, `cargo clippy --all-targets -- -D warnings` and `cargo test` in `scanner/` (CI does, on Windows and Linux). For the Windows code from Linux, `cargo clippy --target x86_64-pc-windows-gnu` catches most mistakes.
 - **Keep the design.** Colors, spacing and type sizes come from the original mockups. Reuse the existing tokens (`--accent`, the gray scale, `Geist` / `Geist Mono`) rather than adding new ones.
 - **Be careful with anything that deletes.** Changes to cleanup rules or deletion code need a clear reason and a manual test on throwaway files.
-- **No telemetry, and no network unless the person asked for it.** Strata works offline. The only network call is the update check (Settings › Updates), which is off until they say yes and sends nothing about them. It lives in `src-tauri/src/updates.rs`; the UI itself can't reach the network (see the CSP in `tauri.conf.json`).
+- **No telemetry, and no network unless the person asked for it.** Strata works offline. The only network call is the update check (Settings › Updates), which is off until they say yes and sends nothing about them. It lives in `src/app/updates.rs`; the UI itself can't reach the network (see the CSP in `tauri.conf.json`).
 
 ## Testing your change
 
@@ -72,7 +72,7 @@ If your change affects how a screen looks, run `npm run screenshots` and commit 
 
 - Keep pull requests focused: one fix or feature per PR.
 - Write commit messages in the imperative, with a short summary line: `Add sunburst labels for the second ring`. [Conventional Commits](https://www.conventionalcommits.org/) prefixes (`fix:`, `feat:`, `docs:`) are welcome but not required.
-- Update [CHANGELOG.md](CHANGELOG.md) under **Unreleased**: user-visible changes under Added / Changed / Fixed (these become the release notes in the app, on the website and on GitHub), CI, tests and tooling under **Internal**. CI asks for an entry when a PR changes `src/`, `src-tauri/src/` or `scanner/src/` (label it `no-changelog` when there is nothing to say).
+- Update [CHANGELOG.md](CHANGELOG.md) under **Unreleased**: user-visible changes under Added / Changed / Fixed (these become the release notes in the app, on the website and on GitHub), CI, tests and tooling under **Internal**. CI asks for an entry when a PR changes `src/` or `scanner/src/` (label it `no-changelog` when there is nothing to say).
 - Fill in the pull request template, including how you tested.
 
 ## Releasing (maintainers)

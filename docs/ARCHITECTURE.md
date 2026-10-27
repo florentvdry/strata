@@ -18,7 +18,7 @@ flowchart LR
     T --> C
   end
   P["bridge.js<br/>window.strata"]
-  subgraph Main["App (src-tauri, Rust)"]
+  subgraph Main["App (src/app, Rust)"]
     IPC["Commands<br/>scans · files · settings · history · updates"]
   end
   subgraph Scanner["strata-scan (Rust)"]
@@ -145,9 +145,9 @@ Saved scans live in the data folder (`scans/`), alongside an `index.json` of rec
 - **Linux** (`platform/linux/trash.rs`): the **freedesktop.org Trash**. The home Trash (`$XDG_DATA_HOME/Trash`, usually `~/.local/share/Trash`) when the item is on the same file system, otherwise `$topdir/.Trash/$uid` (when it's a sticky folder, not a link) or `$topdir/.Trash-$uid` on the item's own drive. A `.trashinfo` file with the original path and the local date is reserved with `O_EXCL` before the move, as the spec asks.
 - **Permanent** deletion is shared (`delete.rs`): recursive, links and junctions removed as links, never followed; read-only attributes cleared on Windows.
 
-## App (`src-tauri/`)
+## App (`src/app/`)
 
-A [Tauri](https://tauri.app) app: the UI runs in the web view the system already has (WebView2 on Windows, WebKitGTK on Linux) and talks to Rust code through commands. One command per call of `window.strata`, in `src/commands.rs`.
+A [Tauri](https://tauri.app) app: the UI runs in the web view the system already has (WebView2 on Windows, WebKitGTK on Linux) and talks to Rust code through commands. One command per call of `window.strata`, in `commands.rs`.
 
 - **Window and security:** one window, created in `setup` so the portable build can keep the web view's files next to the `.exe`. The Content-Security-Policy is in `tauri.conf.json`; navigation away from the app is refused. The UI has no file system or shell access of its own: only the app's commands, which check what they are asked.
 - **The scanner is inside the app** (`scanner.rs`). `build.rs` embeds `bin/strata-scan(.exe)`; on first run (and after each update) it is unpacked to `<data>/bin/`, so a portable build stays one file. `scanner::run` starts it, reads its JSON lines and forwards them to the UI as events.

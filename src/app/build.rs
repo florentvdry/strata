@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-// The scanner (../scanner, built by `npm run build:scanner` into ../bin) is embedded in the app and
+// The scanner (/scanner, built by `npm run build:scanner` into /bin) is embedded in the app and
 // extracted on first run, so the portable build stays one file. Without it (cargo check, tests) the
 // app falls back to ../bin at run time.
 fn main() {
@@ -10,7 +10,7 @@ fn main() {
         "strata-scan"
     };
     let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
-    let scanner = manifest.join("..").join("bin").join(name);
+    let scanner = manifest.join("..").join("..").join("bin").join(name);
     println!("cargo:rerun-if-changed={}", scanner.display());
     println!("cargo:rerun-if-env-changed=STRATA_SCANNER");
     let chosen = std::env::var_os("STRATA_SCANNER").map(PathBuf::from).unwrap_or(scanner);
